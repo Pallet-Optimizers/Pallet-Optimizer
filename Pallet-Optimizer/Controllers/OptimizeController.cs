@@ -1,5 +1,7 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using Pallet_Optimizer.Models;
 
 namespace Pallet_Optimizer.Controllers
 {
@@ -8,19 +10,32 @@ namespace Pallet_Optimizer.Controllers
         // GET: OptimizeController
         public ActionResult Index()
         {
-            return View("Optimize");
+
+            return View("Optimize", new PalletHolder());
         }
 
-        // GET: OptimizeController/Details/5
-        public ActionResult Details(int id)
-        {
-            return View();
-        }
+
 
         // GET: OptimizeController/Create
         public ActionResult Create()
         {
             return View();
+        }
+
+        public ActionResult OnPalletTypeChange(List<Pallet> pallets)
+        {
+            Console.WriteLine("pallet changed");
+            foreach(var pallet in pallets)
+            {
+                // Perform some logic based on pallet properties
+                if (pallet.Active)
+                {
+                    // Example logic: Log active pallets
+                    Console.WriteLine($"Active Pallet: {pallet.Description}");
+                }
+            }
+
+            return View("Optimize", pallets);
         }
 
         // POST: OptimizeController/Create
@@ -38,46 +53,5 @@ namespace Pallet_Optimizer.Controllers
             }
         }
 
-        // GET: OptimizeController/Edit/5
-        public ActionResult Edit(int id)
-        {
-            return View();
-        }
-
-        // POST: OptimizeController/Edit/5
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public ActionResult Edit(int id, IFormCollection collection)
-        {
-            try
-            {
-                return RedirectToAction();
-            }
-            catch
-            {
-                return View();
-            }
-        }
-
-        // GET: OptimizeController/Delete/5
-        public ActionResult Delete(int id)
-        {
-            return View();
-        }
-
-        // POST: OptimizeController/Delete/5
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public ActionResult Delete(int id, IFormCollection collection)
-        {
-            try
-            {
-                return RedirectToAction(nameof(Index));
-            }
-            catch
-            {
-                return View();
-            }
-        }
     }
 }
