@@ -1,27 +1,19 @@
+using Pallet_Optimizer.Data;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
 builder.Services.AddControllersWithViews();
+
+
+builder.Services.AddSingleton<IPalletRepository, InMemoryPalletRepository>();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (!app.Environment.IsDevelopment())
-{
-    app.UseExceptionHandler("/Home/Error");
-}
-app.UseRouting();
-
-app.UseAuthorization();
-
 app.UseStaticFiles();
-app.MapDefaultControllerRoute();
-
+app.UseRouting();
 
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}")
-    .WithStaticAssets();
-
+    pattern: "{controller=Pallet}/{action=Index}/{id?}");
 
 app.Run();
