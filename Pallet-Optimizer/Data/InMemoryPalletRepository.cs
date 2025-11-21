@@ -7,72 +7,58 @@ namespace Pallet_Optimizer.Data
 {
     public class InMemoryPalletRepository : IPalletRepository
     {
-        private readonly PalletHolder _holder;
+        private readonly List<Pallet> _store = new List<Pallet>();
 
         public InMemoryPalletRepository()
         {
-            // sample seed data
-            _holder = new PalletHolder
-            {
-                Pallets = new List<Pallet>
-                {
-                    new Pallet
-                    {
-                        Id = Guid.NewGuid().ToString(),
-                        Name = "Pallet A",
-                        MaterialType = 0,
-                        Elements = new List<Element>
-                        {
-                            new Element { Id = Guid.NewGuid().ToString(), Name = "Box 1"},
-                            new Element { Id = Guid.NewGuid().ToString(), Name = "Box 2"},
-                            new Element { Id = Guid.NewGuid().ToString(), Name = "Box 3"}
-                        }
-                    },
-                    new Pallet
-                    {
-                        Id = Guid.NewGuid().ToString(),
-                        Name = "Pallet B",
-                        MaterialType = PALLET_MATERIAL_TYPE.Plastic,
-                        Elements = new List<Element>
-                        {
-                            new Element { Id = Guid.NewGuid().ToString(), Name = "Box 3"}
-                        }
-                    }
-                },
-                CurrentPalletIndex = 0
-            };
+            _store.Add(new Pallet { Id = "1", Name = "Pallet A", MaterialType = PALLET_MATERIAL_TYPE.Wood });
+            _store.Add(new Pallet { Id = "2", Name = "Pallet B", MaterialType = PALLET_MATERIAL_TYPE.Plastic });
         }
 
         public Task AddPalletAsync(Pallet pallet)
         {
-            pallet.Id = _holder.Pallets.Any() ? _holder.Pallets.Max(p => p.Id) + 1 : 0.ToString();
-            _holder.Pallets.Add(pallet);
+            _store.Add(pallet);
             return Task.CompletedTask;
         }
 
-        public Task<Pallet> GetPalletAsync(int index)
+        public Task<Pallet?> GetPalletAsync(string index)
         {
-            var pallet = _holder.Pallets.ElementAtOrDefault(index);
-            return Task.FromResult(pallet);
+            var p = _store.FirstOrDefault(x => x.Id == index);
+            return Task.FromResult<Pallet?>(p);
         }
-
-  
-
 
         public Task<PalletHolder> GetHolderAsync()
         {
-            return Task.FromResult(_holder);
+            var holder = new PalletHolder
+            {
+                Pallets = _store.ToList(),
+                CurrentPalletIndex = 0
+            };
+            return Task.FromResult(holder);
         }
 
-        public Task UpdatePalletAsync(int index, Pallet updated)
+        public Task UpdatePalletAsync(string index, Pallet updated)
         {
-            var existing = _holder.Pallets.ElementAtOrDefault(index);
+            var existing = _store.FirstOrDefault(p => p.Id == index);
             if (existing != null)
             {
                 existing.Name = updated.Name;
                 existing.MaterialType = updated.MaterialType;
-                existing.Elements = updated.Elements ?? new List<Element>();
+                existing.Width = updated.Width;
+                existing.Height = updated.Height;
+                existing.Length = updated.Length;
+                existing.MaxHeight = updated.MaxHeight;
+                existing.MaxWeight = updated.MaxWeight;
+                existing.IsSpecial = updated.IsSpecial;
+                existing.Elements = updated.Elements;
             }
+            return Task.CompletedTask;
+        }
+
+        public Task DeletePalletAsync(string index)
+        {
+            var existing = _store.FirstOrDefault(p => p.Id == index);
+            if (existing != null) _store.Remove(existing);
             return Task.CompletedTask;
         }
     }

@@ -4,7 +4,6 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllersWithViews();
 
-
 builder.Services.AddSingleton<IPalletRepository, InMemoryPalletRepository>();
 
 var app = builder.Build();
@@ -14,6 +13,6 @@ app.UseRouting();
 
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Pallet}/{action=Index}/{id?}");
+    pattern: "{controller=Pallet}/{action=Index}");
 
 app.Run();

@@ -8,21 +8,21 @@
 <html>
 <head>
     <meta charset="utf-8" />
-    <title>Pallet Visualizer & Manager</title>
+    <title>Pallet Visualizer</title>
 
     <script src="https://cdn.babylonjs.com/babylon.js"></script>
     <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
 
+    <link rel="stylesheet" href="~/css/site.css" />
     <style>
         body, html {
             height: 100%;
             margin: 0;
             display: flex;
-            font-family: sans-serif;
         }
 
         .sidebar {
-            width: 360px;
+            width: 380px;
             background: #0f1720;
             color: #e6eef6;
             padding: 16px;
@@ -39,60 +39,142 @@
             width: 100%;
             height: 100%;
             display: block;
-            background: #1e293b;
         }
 
         .control-row {
             margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
         }
 
         label {
             display: block;
             margin-bottom: 4px;
             color: #cbd5e1;
+            font-size: 13px;
         }
 
-        select, input[type=number], input[type=range], button {
+        select, input[type=range], input[type=text], input[type=number] {
             width: 100%;
-            margin-bottom: 6px;
+            padding: 4px;
+            box-sizing: border-box;
         }
 
-        .element-row {
-            padding: 6px;
-            border: 1px solid #334155;
-            margin-bottom: 6px;
+        input[type=text], input[type=number] {
+            background: #1a2332;
+            border: 1px solid #2d3748;
+            color: #e6eef6;
         }
 
-            .element-row input {
-                width: 60px;
-                display: inline-block;
-                margin-right: 4px;
-            }
-
-            .element-row button {
-                width: auto;
-                display: inline-block;
-                margin-left: 4px;
-            }
-
-        h3, h4 {
-            margin: 12px 0 6px 0;
-        }
-
-        hr {
+        button {
+            background: #3b82f6;
+            color: #fff;
             border: none;
-            border-top: 1px solid #334155;
-            margin: 12px 0;
+            padding: 6px 12px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+            button:hover {
+                background: #2563eb;
+            }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            color: #e6eef6;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+
+        th {
+            background: #1a2332;
+            padding: 6px 4px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        td {
+            padding: 6px 4px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .small-btn {
+            font-size: 11px;
+            padding: 3px 6px;
+            margin-right: 2px;
+        }
+
+        .btn-delete, .btn-remove {
+            background: #dc2626;
+        }
+
+            .btn-delete:hover, .btn-remove:hover {
+                background: #b91c1c;
+            }
+
+        .btn-success {
+            background: #10b981;
+        }
+
+            .btn-success:hover {
+                background: #059669;
+            }
+
+        #editor, #elementEditor {
+            background: #1a2332;
+            padding: 12px;
+            margin-top: 8px;
+            border-radius: 4px;
+            display: none;
+        }
+
+            #editor input[type=text], #elementEditor input {
+                margin-bottom: 8px;
+            }
+
+        h3 {
+            margin: 8px 0 6px;
+            font-size: 14px;
+            color: #94a3b8;
+        }
+
+        .input-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .input-row input {
+            flex: 1;
+        }
+
+        .stats {
+            background: #1a2332;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            margin-top: 8px;
+        }
+
+        .stats div {
+            margin: 4px 0;
         }
     </style>
 </head>
 <body>
     <div class="sidebar">
-        <h2>Pallet Manager</h2>
+        <h2 style="margin-top:0;">Pallet Controls</h2>
 
         <div class="control-row">
-            <label>Pallet</label>
-            <select id="palletSelect"></select>
+            <label>Select Pallet</label>
+            <select id="palletSelect">
+                @for (int i = 0; i < (Model?.Pallets?.Count ?? 0); i++)
+                {
+                    var p = Model.Pallets[i];
+                    <option value="@i" data-id="@p.Id" selected="@(i == currentIndex)">@p.Name (@p.Id)</option>
+                }
+            </select>
         </div>
 
         <div class="control-row">
@@ -106,31 +188,129 @@
         </div>
 
         <div class="control-row">
-            <label>Max Height (mm)</label>
-            <input type="number" id="maxHeight" step="0.1" />
+            <label>Scale</label>
+            <input type="range" id="scaleRange" min="10" max="200" value="100" />
         </div>
 
         <div class="control-row">
-            <label>Max Weight (kg)</label>
-            <input type="number" id="maxWeight" step="0.1" />
+            <button id="saveBtn">Save Changes</button>
         </div>
 
-        <hr />
+        <!-- ELEMENT MANAGEMENT -->
+        <div class="control-row">
+            <h3>📦 Add Element to Pallet</h3>
+            <label>Element Name:</label>
+            <input type="text" id="elementName" placeholder="Box A" />
+            
+            <div class="input-row">
+                <div style="flex:1">
+                    <label>Width (m):</label>
+                    <input type="number" id="elementWidth" step="0.01" value="0.4" />
+                </div>
+                <div style="flex:1">
+                    <label>Height (m):</label>
+                    <input type="number" id="elementHeight" step="0.01" value="0.3" />
+                </div>
+                <div style="flex:1">
+                    <label>Depth (m):</label>
+                    <input type="number" id="elementDepth" step="0.01" value="0.4" />
+                </div>
+            </div>
 
-        <h3>Elements</h3>
-        <div id="elementsContainer"></div>
+            <label>Weight (kg):</label>
+            <input type="number" id="elementWeight" step="0.1" value="5.0" />
 
-        <hr />
+            <div style="margin-top:8px;">
+                <label>
+                    <input type="checkbox" id="elementCanRotate" checked /> Can Rotate
+                </label>
+                <label>
+                    <input type="checkbox" id="elementMustBeAlone" /> Must Be Alone
+                </label>
+            </div>
 
-        <h4>Add Element</h4>
-        <label>Width</label><input type="number" id="elWidth" value="0.5" step="0.01">
-        <label>Height</label><input type="number" id="elHeight" value="0.4" step="0.01">
-        <label>Depth</label><input type="number" id="elDepth" value="0.4" step="0.01">
-        <label>Weight</label><input type="number" id="elWeight" value="1" step="0.1">
-        <button id="addElementBtn">Add Element</button>
+            <button id="addElementBtn" class="btn-success" style="margin-top:8px; width:100%;">Add Element</button>
+        </div>
 
-        <hr />
-        <button id="saveBtn">Save Pallet</button>
+        <!-- ELEMENTS LIST -->
+        <div class="control-row">
+            <h3>📋 Elements on Pallet</h3>
+            <div id="elementsList">
+                <p style="color:#64748b; font-size:11px;">Select a pallet to see elements</p>
+            </div>
+            <div id="palletStats" class="stats" style="display:none;">
+                <div><strong>Current Height:</strong> <span id="statHeight">0</span> m</div>
+                <div><strong>Current Weight:</strong> <span id="statWeight">0</span> kg</div>
+                <div><strong>Elements Count:</strong> <span id="statCount">0</span></div>
+            </div>
+        </div>
+
+        <!-- CREATE PALLET FORM -->
+        <div class="control-row">
+            <h3>➕ Create New Pallet</h3>
+            <label>Name:</label>
+            <input type="text" id="addName" placeholder="Enter name..." />
+            <label style="margin-top:6px;">Material:</label>
+            <select id="addMaterial">
+                @foreach (var val in Enum.GetValues(typeof(Pallet_Optimizer.Models.PALLET_MATERIAL_TYPE)))
+                {
+                    <option value="@val">@val</option>
+                }
+            </select>
+            <button id="addPalletBtn" style="margin-top:8px; width:100%;">Add Pallet</button>
+        </div>
+
+        <!-- PALLET LIST with CRUD -->
+        <div class="control-row" style="border:none;">
+            <h3>📋 All Pallets</h3>
+            <table id="palletTable">
+                <thead>
+                    <tr>
+                        <th style="width:50px;">Id</th>
+                        <th>Name</th>
+                        <th style="width:80px;">Material</th>
+                        <th style="width:140px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model?.Pallets != null)
+                    {
+                        foreach (var p in Model.Pallets)
+                        {
+                            <tr data-id="@p.Id">
+                                <td>@p.Id.Substring(0, Math.Min(8, p.Id.Length))</td>
+                                <td class="name">@p.Name</td>
+                                <td class="material">@p.MaterialType</td>
+                                <td>
+                                    <button class="btn-get small-btn" data-id="@p.Id">View</button>
+                                    <button class="btn-edit small-btn" data-id="@p.Id">Edit</button>
+                                    <button class="btn-delete small-btn" data-id="@p.Id">Delete</button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- EDIT FORM (inline) -->
+        <div id="editor">
+            <h3>✏️ Edit Pallet</h3>
+            <input id="editId" type="hidden" />
+            <label>Name:</label>
+            <input type="text" id="editName" />
+            <label>Material:</label>
+            <select id="editMaterial">
+                @foreach (var val in Enum.GetValues(typeof(Pallet_Optimizer.Models.PALLET_MATERIAL_TYPE)))
+                {
+                    <option value="@val">@val</option>
+                }
+            </select>
+            <div style="margin-top:8px;">
+                <button id="savePalletBtn">Save</button>
+                <button id="cancelPalletBtn" style="background:#64748b;">Cancel</button>
+            </div>
+        </div>
     </div>
 
     <div class="content">
@@ -138,180 +318,445 @@
     </div>
 
     <script>
-        // initial data from server
-        const holder = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model)) || { Pallets: [], CurrentPalletIndex: 0 };
-        let currentIndex = @currentIndex;
+        window.__PalletHolder = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model));
+        window.__initialIndex = @currentIndex;
+    </script>
 
-        // Babylon.js scene setup
-        const canvas = document.getElementById('renderCanvas');
-        const engine = new BABYLON.Engine(canvas,true);
-        const scene = new BABYLON.Scene(engine);
+    <script>
+        // ========== BABYLON.JS RENDERING ==========
+        (function () {
+            'use strict';
 
-        const camera = new BABYLON.ArcRotateCamera("cam", Math.PI/2, Math.PI/3, 6, BABYLON.Vector3.Zero(), scene);
-        camera.attachControl(canvas,true);
+            console.log('Babylon.js initializing...');
 
-        const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(1,1,0), scene);
-
-        let createdMeshes = [];
-        let createdMaterials = [];
-
-        function disposeAll(){
-            createdMeshes.forEach(m=>{try{m.dispose(true,true);}catch{}});
-            createdMeshes=[];
-            createdMaterials.forEach(m=>{try{m.dispose(true,true);}catch{}});
-            createdMaterials=[];
-        }
-
-        function renderPallet(pallet){
-            if(!pallet) return;
-            disposeAll();
-
-            // draw pallet base
-            const baseMat = new BABYLON.StandardMaterial("baseMat", scene);
-            switch(pallet.MaterialType){
-                case "Wood": baseMat.diffuseColor = new BABYLON.Color3(0.6,0.4,0.2); break;
-                case "Plastic": baseMat.diffuseColor = new BABYLON.Color3(0.1,0.6,0.9); break;
-                case "Metal": baseMat.diffuseColor = new BABYLON.Color3(0.7,0.7,0.7); break;
-                default: baseMat.diffuseColor = new BABYLON.Color3(0.8,0.8,0.8);
+            const canvas = document.getElementById('renderCanvas');
+            if (!canvas) {
+                console.error('Canvas not found!');
+                return;
             }
-            const base = BABYLON.MeshBuilder.CreateBox("palletBase",{width:1.2,height:0.2,depth:1.0},scene);
-            base.material = baseMat;
-            base.position.y = 0.1;
-            createdMeshes.push(base);
-            createdMaterials.push(baseMat);
 
-            // draw elements
-            (pallet.Elements||[]).forEach((el,i)=>{
-                const mesh = BABYLON.MeshBuilder.CreateBox(`el_${i}`,{
-                    width:el.Width,height:el.Height,depth:el.Depth
-                },scene);
-                mesh.position.x = el.X||0;
-                mesh.position.y = (el.Y||0)+(el.Height/2)+0.2;
-                mesh.position.z = el.Z||0;
-                const mat = new BABYLON.StandardMaterial(`mat_${i}`,scene);
-                mat.diffuseColor = new BABYLON.Color3(Math.random(),Math.random(),Math.random());
-                mesh.material = mat;
-                createdMeshes.push(mesh);
-                createdMaterials.push(mat);
-            });
-        }
+            const engine = new BABYLON.Engine(canvas, true);
+            const scene = new BABYLON.Scene(engine);
+            scene.clearColor = new BABYLON.Color4(0.1, 0.15, 0.2, 1);
 
-        engine.runRenderLoop(()=>scene.render());
-        window.addEventListener('resize',()=>engine.resize());
+            const camera = new BABYLON.ArcRotateCamera(
+                'camera', -Math.PI / 2, Math.PI / 3, 10,
+                BABYLON.Vector3.Zero(), scene
+            );
+            camera.attachControl(canvas, true);
+            camera.lowerRadiusLimit = 2;
+            camera.upperRadiusLimit = 50;
+            camera.wheelPrecision = 50;
 
-        // populate pallet select
-        const palletSelect = document.getElementById('palletSelect');
-        function refreshPalletSelect(){
-            palletSelect.innerHTML='';
-            holder.Pallets.forEach((p,i)=>{
-                const opt=document.createElement('option');
-                opt.value=i;
-                opt.text=`${p.Name} (${i})`;
-                if(i===currentIndex) opt.selected=true;
-                palletSelect.add(opt);
-            });
-        }
-        refreshPalletSelect();
+            const light1 = new BABYLON.HemisphericLight('light1', new BABYLON.Vector3(1, 1, 0), scene);
+            light1.intensity = 0.7;
 
-        palletSelect.addEventListener('change',()=>{
-            currentIndex=parseInt(palletSelect.value);
-            const pallet = holder.Pallets[currentIndex];
-            document.getElementById('materialSelect').value=pallet.MaterialType;
-            document.getElementById('maxHeight').value=pallet.MaxHeight||0;
-            document.getElementById('maxWeight').value=pallet.MaxWeight||0;
-            renderPallet(pallet);
-            refreshElementList();
-        });
+            const light2 = new BABYLON.DirectionalLight('light2', new BABYLON.Vector3(-1, -2, -1), scene);
+            light2.position = new BABYLON.Vector3(5, 10, 5);
+            light2.intensity = 0.5;
 
-        // pallet settings
-        document.getElementById('materialSelect').addEventListener('change',()=>{
-            const val=document.getElementById('materialSelect').value;
-            holder.Pallets[currentIndex].MaterialType=val;
-            renderPallet(holder.Pallets[currentIndex]);
-        });
-        document.getElementById('maxHeight').addEventListener('input',()=>holder.Pallets[currentIndex].MaxHeight=parseFloat(document.getElementById('maxHeight').value));
-        document.getElementById('maxWeight').addEventListener('input',()=>holder.Pallets[currentIndex].MaxWeight=parseFloat(document.getElementById('maxWeight').value));
+            const ground = BABYLON.MeshBuilder.CreateGround('ground', { width: 20, height: 20 }, scene);
+            const groundMat = new BABYLON.StandardMaterial('groundMat', scene);
+            groundMat.diffuseColor = new BABYLON.Color3(0.2, 0.25, 0.3);
+            groundMat.specularColor = new BABYLON.Color3(0, 0, 0);
+            ground.material = groundMat;
+            ground.position.y = -0.01;
 
-        // elements list
-        function refreshElementList(){
-            const container=document.getElementById('elementsContainer');
-            container.innerHTML='';
-            const elements=holder.Pallets[currentIndex].Elements||[];
-            elements.forEach((el,i)=>{
-                const div=document.createElement('div');
-                div.className='element-row';
-                div.innerHTML=`
-                    <strong>Element ${i}</strong><br/>
-                    X:<input type="number" value="${el.X||0}" step="0.01" data-prop="X" data-index="${i}"/>
-                    Y:<input type="number" value="${el.Y||0}" step="0.01" data-prop="Y" data-index="${i}"/>
-                    Z:<input type="number" value="${el.Z||0}" step="0.01" data-prop="Z" data-index="${i}"/><br/>
-                    W:<input type="number" value="${el.Width}" step="0.01" data-prop="Width" data-index="${i}"/>
-                    H:<input type="number" value="${el.Height}" step="0.01" data-prop="Height" data-index="${i}"/>
-                    D:<input type="number" value="${el.Depth}" step="0.01" data-prop="Depth" data-index="${i}"/><br/>
-                    Weight:<input type="number" value="${el.WeightKg||0}" step="0.1" data-prop="WeightKg" data-index="${i}"/>
-                    <button data-action="rotate" data-index="${i}">Rotate</button>
-                    <button data-action="delete" data-index="${i}">Delete</button>
-                `;
-                container.appendChild(div);
-            });
+            let currentPalletMeshes = [];
+            let currentScale = 1.0;
 
-            // input updates
-            container.querySelectorAll('input').forEach(inp=>{
-                inp.addEventListener('input',()=>{
-                    const idx=parseInt(inp.dataset.index);
-                    const prop=inp.dataset.prop;
-                    holder.Pallets[currentIndex].Elements[idx][prop]=parseFloat(inp.value);
-                    renderPallet(holder.Pallets[currentIndex]);
+            const materialColors = {
+                0: new BABYLON.Color3(0.6, 0.4, 0.2),
+                1: new BABYLON.Color3(0.7, 0.7, 0.8),
+                2: new BABYLON.Color3(0.3, 0.5, 0.7),
+                3: new BABYLON.Color3(0.9, 0.9, 0.5)
+            };
+
+            function createPalletVisualization(pallet, scale) {
+                currentPalletMeshes.forEach(mesh => mesh.dispose());
+                currentPalletMeshes = [];
+
+                if (!pallet) return;
+
+                const palletWidth = (pallet.Width || 1.2) * scale;
+                const palletDepth = (pallet.Length || 0.8) * scale;
+                const palletHeight = (pallet.Height || 0.15) * scale;
+
+                const palletBase = BABYLON.MeshBuilder.CreateBox(
+                    'palletBase',
+                    { width: palletWidth, height: palletHeight, depth: palletDepth },
+                    scene
+                );
+                palletBase.position.y = palletHeight / 2;
+
+                const palletMat = new BABYLON.StandardMaterial('palletMat', scene);
+                palletMat.diffuseColor = materialColors[pallet.MaterialType || 0];
+                palletMat.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
+                palletBase.material = palletMat;
+
+                currentPalletMeshes.push(palletBase);
+
+                // Support blocks
+                const blockWidth = 0.1 * scale;
+                const blockHeight = palletHeight * 0.8;
+                const blockDepth = palletDepth * 0.9;
+
+                for (let i = 0; i < 3; i++) {
+                    const xPos = (i - 1) * (palletWidth * 0.4);
+                    const block = BABYLON.MeshBuilder.CreateBox(
+                        `support_${i}`,
+                        { width: blockWidth, height: blockHeight, depth: blockDepth },
+                        scene
+                    );
+                    block.position.set(xPos, blockHeight / 2, 0);
+                    block.material = palletMat;
+                    currentPalletMeshes.push(block);
+                }
+
+                // Add elements
+                if (pallet.Elements && Array.isArray(pallet.Elements)) {
+                    let currentY = palletHeight;
+                    pallet.Elements.forEach((element, idx) => {
+                        createElementBox(element, idx, scale, currentY);
+                        currentY += (element.Height || 0.2) * scale;
+                    });
+                }
+
+                const maxDim = Math.max(palletWidth, palletDepth, palletHeight);
+                camera.radius = maxDim * 3;
+                camera.target = new BABYLON.Vector3(0, palletHeight, 0);
+            }
+
+            function createElementBox(element, index, scale, baseY) {
+                const width = (element.Width || 0.3) * scale;
+                const height = (element.Height || 0.2) * scale;
+                const depth = (element.Depth || 0.3) * scale;
+
+                const box = BABYLON.MeshBuilder.CreateBox(
+                    `element_${index}`,
+                    { width, height, depth },
+                    scene
+                );
+
+                box.position.y = baseY + height / 2;
+
+                const mat = new BABYLON.StandardMaterial(`elementMat_${index}`, scene);
+                const hue = (index * 137.5) % 360;
+                mat.diffuseColor = BABYLON.Color3.FromHSV(hue, 0.7, 0.85);
+                mat.specularColor = new BABYLON.Color3(0.2, 0.2, 0.2);
+                mat.alpha = 0.9;
+                box.material = mat;
+
+                box.enableEdgesRendering();
+                box.edgesWidth = 2.0;
+                box.edgesColor = new BABYLON.Color4(0, 0, 0, 1);
+
+                currentPalletMeshes.push(box);
+            }
+
+            window.loadPallet = function(index) {
+                const holder = window.__PalletHolder;
+                if (!holder || !holder.Pallets || !holder.Pallets[index]) return;
+
+                const pallet = holder.Pallets[index];
+                createPalletVisualization(pallet, currentScale);
+
+                const materialSelect = document.getElementById('materialSelect');
+                if (materialSelect) {
+                    materialSelect.value = pallet.MaterialType || 0;
+                }
+
+                updateElementsList(pallet);
+                updatePalletStats(pallet);
+            };
+
+            function updateElementsList(pallet) {
+                const container = document.getElementById('elementsList');
+                if (!pallet.Elements || pallet.Elements.length === 0) {
+                    container.innerHTML = '<p style="color:#64748b; font-size:11px;">No elements on this pallet</p>';
+                    return;
+                }
+
+                let html = '<table style="width:100%; font-size:11px;"><thead><tr><th>Name</th><th>Size</th><th></th></tr></thead><tbody>';
+                pallet.Elements.forEach(el => {
+                    html += `<tr>
+                        <td>${el.Name}</td>
+                        <td>${el.Width?.toFixed(2)}×${el.Height?.toFixed(2)}×${el.Depth?.toFixed(2)}</td>
+                        <td><button class="btn-remove small-btn" data-element-id="${el.Id}">Remove</button></td>
+                    </tr>`;
                 });
-            });
+                html += '</tbody></table>';
+                container.innerHTML = html;
+            }
 
-            // rotate/delete
-            container.querySelectorAll('button').forEach(btn=>{
-                btn.addEventListener('click',()=>{
-                    const idx=parseInt(btn.dataset.index);
-                    const action=btn.dataset.action;
-                    if(action==='rotate'){
-                        const el=holder.Pallets[currentIndex].Elements[idx];
-                        [el.Width,el.Depth]=[el.Depth,el.Width];
-                        renderPallet(holder.Pallets[currentIndex]);
-                        refreshElementList();
-                    }else if(action==='delete'){
-                        holder.Pallets[currentIndex].Elements.splice(idx,1);
-                        renderPallet(holder.Pallets[currentIndex]);
-                        refreshElementList();
+            function updatePalletStats(pallet) {
+                const statsDiv = document.getElementById('palletStats');
+                if (!pallet.Elements || pallet.Elements.length === 0) {
+                    statsDiv.style.display = 'none';
+                    return;
+                }
+
+                const totalHeight = pallet.Elements.reduce((sum, el) => sum + (el.Height || 0), 0);
+                const totalWeight = pallet.Elements.reduce((sum, el) => sum + (el.WeightKg || 0), 0);
+
+                document.getElementById('statHeight').textContent = totalHeight.toFixed(2);
+                document.getElementById('statWeight').textContent = totalWeight.toFixed(1);
+                document.getElementById('statCount').textContent = pallet.Elements.length;
+                statsDiv.style.display = 'block';
+            }
+
+            const palletSelect = document.getElementById('palletSelect');
+            if (palletSelect) {
+                palletSelect.addEventListener('change', function () {
+                    loadPallet(parseInt(this.value));
+                });
+            }
+
+            const scaleRange = document.getElementById('scaleRange');
+            if (scaleRange) {
+                scaleRange.addEventListener('input', function () {
+                    currentScale = parseInt(this.value) / 100;
+                    const selectedIndex = palletSelect ? parseInt(palletSelect.value) : window.__initialIndex;
+                    loadPallet(selectedIndex);
+                });
+            }
+
+            engine.runRenderLoop(() => scene.render());
+            window.addEventListener('resize', () => engine.resize());
+
+            loadPallet(window.__initialIndex || 0);
+        })();
+    </script>
+
+    <script>
+        // ========== CRUD OPERATIONS ==========
+        (function () {
+            function getCurrentPalletId() {
+                const select = document.getElementById('palletSelect');
+                const option = select.options[select.selectedIndex];
+                return option.getAttribute('data-id');
+            }
+
+            // ========== ADD ELEMENT ==========
+            document.getElementById('addElementBtn').addEventListener('click', async function () {
+                const palletId = getCurrentPalletId();
+                const name = document.getElementById('elementName').value.trim();
+                
+                if (!name) {
+                    alert('Please enter an element name');
+                    return;
+                }
+
+                const dto = {
+                    palletId: palletId,
+                    name: name,
+                    width: parseFloat(document.getElementById('elementWidth').value),
+                    height: parseFloat(document.getElementById('elementHeight').value),
+                    depth: parseFloat(document.getElementById('elementDepth').value),
+                    weightKg: parseFloat(document.getElementById('elementWeight').value),
+                    canRotate: document.getElementById('elementCanRotate').checked,
+                    mustBeAlone: document.getElementById('elementMustBeAlone').checked
+                };
+
+                try {
+                    const res = await fetch('/Pallet/AddElement', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(dto)
+                    });
+
+                    if (!res.ok) {
+                        alert('Failed to add element');
+                        return;
                     }
-                });
+
+                    const json = await res.json();
+                    if (json.success) {
+                        // Update local data
+                        window.__PalletHolder.Pallets.find(p => p.Id === palletId).Elements = json.pallet.Elements;
+                        
+                        // Refresh visualization
+                        const select = document.getElementById('palletSelect');
+                        window.loadPallet(parseInt(select.value));
+                        
+                        // Reset form
+                        document.getElementById('elementName').value = '';
+                        
+                        alert('Element added successfully!');
+                    }
+                } catch (err) {
+                    console.error('Error:', err);
+                    alert('Error adding element: ' + err.message);
+                }
             });
-        }
 
-        refreshElementList();
+            // ========== REMOVE ELEMENT ==========
+            document.addEventListener('click', async function (e) {
+                if (e.target.matches('.btn-remove')) {
+                    const elementId = e.target.getAttribute('data-element-id');
+                    const palletId = getCurrentPalletId();
 
-        // add element
-        document.getElementById('addElementBtn').addEventListener('click',()=>{
-            const el={Width:parseFloat(document.getElementById('elWidth').value),
-                      Height:parseFloat(document.getElementById('elHeight').value),
-                      Depth:parseFloat(document.getElementById('elDepth').value),
-                      WeightKg:parseFloat(document.getElementById('elWeight').value),
-                      X:0,Y:0,Z:0};
-            if(!holder.Pallets[currentIndex].Elements) holder.Pallets[currentIndex].Elements=[];
-            holder.Pallets[currentIndex].Elements.push(el);
-            renderPallet(holder.Pallets[currentIndex]);
-            refreshElementList();
-        });
+                    if (!confirm('Remove this element?')) return;
 
-        // save pallet
-        document.getElementById('saveBtn').addEventListener('click',()=>{
-            fetch('/Pallet/UpdatePallet',{
-                method:'POST',
-                headers:{'Content-Type':'application/json'},
-                body:JSON.stringify(holder.Pallets[currentIndex])
-            }).then(r=>r.json())
-              .then(res=>{if(res.success)console.log('Saved'); else console.error('Save failed');})
-              .catch(err=>console.error(err));
-        });
+                    try {
+                        const res = await fetch('/Pallet/RemoveElement', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ palletId, elementId })
+                        });
 
-        // initial render
-        renderPallet(holder.Pallets[currentIndex]);
+                        if (!res.ok) {
+                            alert('Failed to remove element');
+                            return;
+                        }
+
+                        const json = await res.json();
+                        if (json.success) {
+                            // Update local data
+                            window.__PalletHolder.Pallets.find(p => p.Id === palletId).Elements = json.pallet.Elements;
+                            
+                            // Refresh visualization
+                            const select = document.getElementById('palletSelect');
+                            window.loadPallet(parseInt(select.value));
+                            
+                            alert('Element removed!');
+                        }
+                    } catch (err) {
+                        console.error('Error:', err);
+                        alert('Error removing element: ' + err.message);
+                    }
+                }
+
+                // ========== VIEW PALLET ==========
+                if (e.target.matches('.btn-get')) {
+                    const id = e.target.dataset.id;
+                    try {
+                        const res = await fetch(`/Pallet/GetPallet?index=${encodeURIComponent(id)}`);
+                        if (!res.ok) {
+                            alert('Pallet not found');
+                            return;
+                        }
+                        const pallet = await res.json();
+                        const elementsInfo = pallet.Elements && pallet.Elements.length > 0 
+                            ? `\nElements: ${pallet.Elements.length}` 
+                            : '\nNo elements';
+                        alert(`Pallet Details:\nID: ${pallet.Id}\nName: ${pallet.Name}\nMaterial: ${pallet.MaterialType}${elementsInfo}`);
+                    } catch (err) {
+                        alert('Error: ' + err.message);
+                    }
+                }
+
+                // ========== EDIT PALLET ==========
+                if (e.target.matches('.btn-edit')) {
+                    const id = e.target.dataset.id;
+                    try {
+                        const res = await fetch(`/Pallet/GetPallet?index=${encodeURIComponent(id)}`);
+                        if (!res.ok) {
+                            alert('Pallet not found');
+                            return;
+                        }
+                        const p = await res.json();
+                        document.getElementById('editId').value = p.Id;
+                        document.getElementById('editName').value = p.Name || '';
+                        document.getElementById('editMaterial').value = p.MaterialType;
+                        document.getElementById('editor').style.display = 'block';
+                    } catch (err) {
+                        alert('Error: ' + err.message);
+                    }
+                }
+
+                // ========== DELETE PALLET ==========
+                if (e.target.matches('.btn-delete')) {
+                    const id = e.target.dataset.id;
+                    if (!confirm(`Delete pallet ${id}?`)) return;
+                    try {
+                        const res = await fetch('/Pallet/DeletePallet', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ index: id })
+                        });
+                        if (!res.ok) {
+                            alert('Delete failed');
+                            return;
+                        }
+                        const json = await res.json();
+                        if (json.success) {
+                            const row = document.querySelector(`tr[data-id="${id}"]`);
+                            if (row) row.remove();
+                            alert('Pallet deleted successfully');
+                            location.reload();
+                        }
+                    } catch (err) {
+                        alert('Error: ' + err.message);
+                    }
+                }
+            });
+
+            // ========== SAVE PALLET EDIT ==========
+            document.getElementById('savePalletBtn').addEventListener('click', async function () {
+                const id = document.getElementById('editId').value;
+                const materialType = parseInt(document.getElementById('editMaterial').value);
+                
+                try {
+                    const res = await fetch('/Pallet/UpdatePallet', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ index: id, materialType })
+                    });
+                    if (!res.ok) {
+                        alert('Update failed');
+                        return;
+                    }
+                    const json = await res.json();
+                    
+                    const row = document.querySelector(`tr[data-id="${id}"]`);
+                    if (row) {
+                        row.querySelector('.material').textContent = json.material;
+                    }
+                    document.getElementById('editor').style.display = 'none';
+                    alert('Pallet updated successfully');
+                    location.reload();
+                } catch (err) {
+                    alert('Error: ' + err.message);
+                }
+            });
+
+            document.getElementById('cancelPalletBtn').addEventListener('click', function () {
+                document.getElementById('editor').style.display = 'none';
+            });
+
+            // ========== CREATE PALLET ==========
+            document.getElementById('addPalletBtn').addEventListener('click', async function () {
+                const name = document.getElementById('addName').value.trim();
+                if (!name) {
+                    alert('Please enter a name');
+                    return;
+                }
+
+                const materialType = parseInt(document.getElementById('addMaterial').value);
+
+                try {
+                    const res = await fetch('/Pallet/AddPallet', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name, materialType })
+                    });
+                    if (!res.ok) {
+                        alert('Add failed');
+                        return;
+                    }
+                    const json = await res.json();
+                    
+                    if (json.success) {
+                        document.getElementById('addName').value = '';
+                        alert('Pallet created successfully');
+                        location.reload();
+                    }
+                } catch (err) {
+                    alert('Error: ' + err.message);
+                }
+            });
+        })();
     </script>
 </body>
 </html>
