@@ -1,6 +1,6 @@
 ﻿@model Pallet_Optimizer.Models.PalletHolder
 @{
-    Layout = null; // adjust to your layout if present
+    Layout = null;
     var currentIndex = Model?.CurrentPalletIndex ?? 0;
 }
 
@@ -8,35 +8,91 @@
 <html>
 <head>
     <meta charset="utf-8" />
-    <title>Pallet Visualizer</title>
+    <title>Pallet Visualizer & Manager</title>
 
     <script src="https://cdn.babylonjs.com/babylon.js"></script>
     <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
 
-    <link rel="stylesheet" href="~/css/site.css" />
     <style>
-        body, html { height: 100%; margin: 0; display: flex; }
-        .sidebar { width: 320px; background: #0f1720; color: #e6eef6; padding: 16px; box-sizing: border-box; }
-        .content { flex: 1; position: relative; }
-        #renderCanvas { width: 100%; height: 100%; display:block; }
-        .control-row { margin-bottom: 12px; }
-        label { display:block; margin-bottom:4px; color:#cbd5e1; }
-        select, input[type=range] { width: 100%; }
+        body, html {
+            height: 100%;
+            margin: 0;
+            display: flex;
+            font-family: sans-serif;
+        }
+
+        .sidebar {
+            width: 360px;
+            background: #0f1720;
+            color: #e6eef6;
+            padding: 16px;
+            box-sizing: border-box;
+            overflow-y: auto;
+        }
+
+        .content {
+            flex: 1;
+            position: relative;
+        }
+
+        #renderCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            background: #1e293b;
+        }
+
+        .control-row {
+            margin-bottom: 12px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 4px;
+            color: #cbd5e1;
+        }
+
+        select, input[type=number], input[type=range], button {
+            width: 100%;
+            margin-bottom: 6px;
+        }
+
+        .element-row {
+            padding: 6px;
+            border: 1px solid #334155;
+            margin-bottom: 6px;
+        }
+
+            .element-row input {
+                width: 60px;
+                display: inline-block;
+                margin-right: 4px;
+            }
+
+            .element-row button {
+                width: auto;
+                display: inline-block;
+                margin-left: 4px;
+            }
+
+        h3, h4 {
+            margin: 12px 0 6px 0;
+        }
+
+        hr {
+            border: none;
+            border-top: 1px solid #334155;
+            margin: 12px 0;
+        }
     </style>
 </head>
 <body>
     <div class="sidebar">
-        <h2>Pallet Controls</h2>
+        <h2>Pallet Manager</h2>
 
         <div class="control-row">
             <label>Pallet</label>
-            <select id="palletSelect">
-                @for (int i = 0; i < (Model?.Pallets?.Count ?? 0); i++)
-                {
-                    var p = Model.Pallets[i];
-                    <option value="@i" selected="@(i == currentIndex)">@p.Name (@i)</option>
-                }
-            </select>
+            <select id="palletSelect"></select>
         </div>
 
         <div class="control-row">
@@ -50,13 +106,31 @@
         </div>
 
         <div class="control-row">
-            <label>Scale</label>
-            <input type="range" id="scaleRange" min="10" max="200" value="100" />
+            <label>Max Height (mm)</label>
+            <input type="number" id="maxHeight" step="0.1" />
         </div>
 
         <div class="control-row">
-            <button id="saveBtn">Save (AJAX)</button>
+            <label>Max Weight (kg)</label>
+            <input type="number" id="maxWeight" step="0.1" />
         </div>
+
+        <hr />
+
+        <h3>Elements</h3>
+        <div id="elementsContainer"></div>
+
+        <hr />
+
+        <h4>Add Element</h4>
+        <label>Width</label><input type="number" id="elWidth" value="0.5" step="0.01">
+        <label>Height</label><input type="number" id="elHeight" value="0.4" step="0.01">
+        <label>Depth</label><input type="number" id="elDepth" value="0.4" step="0.01">
+        <label>Weight</label><input type="number" id="elWeight" value="1" step="0.1">
+        <button id="addElementBtn">Add Element</button>
+
+        <hr />
+        <button id="saveBtn">Save Pallet</button>
     </div>
 
     <div class="content">
@@ -65,10 +139,179 @@
 
     <script>
         // initial data from server
-        window.__PalletHolder = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model));
-        window.__initialIndex = @currentIndex;
-    </script>
+        const holder = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model)) || { Pallets: [], CurrentPalletIndex: 0 };
+        let currentIndex = @currentIndex;
 
-    <script src="~/js/pallet.js"></script>
+        // Babylon.js scene setup
+        const canvas = document.getElementById('renderCanvas');
+        const engine = new BABYLON.Engine(canvas,true);
+        const scene = new BABYLON.Scene(engine);
+
+        const camera = new BABYLON.ArcRotateCamera("cam", Math.PI/2, Math.PI/3, 6, BABYLON.Vector3.Zero(), scene);
+        camera.attachControl(canvas,true);
+
+        const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(1,1,0), scene);
+
+        let createdMeshes = [];
+        let createdMaterials = [];
+
+        function disposeAll(){
+            createdMeshes.forEach(m=>{try{m.dispose(true,true);}catch{}});
+            createdMeshes=[];
+            createdMaterials.forEach(m=>{try{m.dispose(true,true);}catch{}});
+            createdMaterials=[];
+        }
+
+        function renderPallet(pallet){
+            if(!pallet) return;
+            disposeAll();
+
+            // draw pallet base
+            const baseMat = new BABYLON.StandardMaterial("baseMat", scene);
+            switch(pallet.MaterialType){
+                case "Wood": baseMat.diffuseColor = new BABYLON.Color3(0.6,0.4,0.2); break;
+                case "Plastic": baseMat.diffuseColor = new BABYLON.Color3(0.1,0.6,0.9); break;
+                case "Metal": baseMat.diffuseColor = new BABYLON.Color3(0.7,0.7,0.7); break;
+                default: baseMat.diffuseColor = new BABYLON.Color3(0.8,0.8,0.8);
+            }
+            const base = BABYLON.MeshBuilder.CreateBox("palletBase",{width:1.2,height:0.2,depth:1.0},scene);
+            base.material = baseMat;
+            base.position.y = 0.1;
+            createdMeshes.push(base);
+            createdMaterials.push(baseMat);
+
+            // draw elements
+            (pallet.Elements||[]).forEach((el,i)=>{
+                const mesh = BABYLON.MeshBuilder.CreateBox(`el_${i}`,{
+                    width:el.Width,height:el.Height,depth:el.Depth
+                },scene);
+                mesh.position.x = el.X||0;
+                mesh.position.y = (el.Y||0)+(el.Height/2)+0.2;
+                mesh.position.z = el.Z||0;
+                const mat = new BABYLON.StandardMaterial(`mat_${i}`,scene);
+                mat.diffuseColor = new BABYLON.Color3(Math.random(),Math.random(),Math.random());
+                mesh.material = mat;
+                createdMeshes.push(mesh);
+                createdMaterials.push(mat);
+            });
+        }
+
+        engine.runRenderLoop(()=>scene.render());
+        window.addEventListener('resize',()=>engine.resize());
+
+        // populate pallet select
+        const palletSelect = document.getElementById('palletSelect');
+        function refreshPalletSelect(){
+            palletSelect.innerHTML='';
+            holder.Pallets.forEach((p,i)=>{
+                const opt=document.createElement('option');
+                opt.value=i;
+                opt.text=`${p.Name} (${i})`;
+                if(i===currentIndex) opt.selected=true;
+                palletSelect.add(opt);
+            });
+        }
+        refreshPalletSelect();
+
+        palletSelect.addEventListener('change',()=>{
+            currentIndex=parseInt(palletSelect.value);
+            const pallet = holder.Pallets[currentIndex];
+            document.getElementById('materialSelect').value=pallet.MaterialType;
+            document.getElementById('maxHeight').value=pallet.MaxHeight||0;
+            document.getElementById('maxWeight').value=pallet.MaxWeight||0;
+            renderPallet(pallet);
+            refreshElementList();
+        });
+
+        // pallet settings
+        document.getElementById('materialSelect').addEventListener('change',()=>{
+            const val=document.getElementById('materialSelect').value;
+            holder.Pallets[currentIndex].MaterialType=val;
+            renderPallet(holder.Pallets[currentIndex]);
+        });
+        document.getElementById('maxHeight').addEventListener('input',()=>holder.Pallets[currentIndex].MaxHeight=parseFloat(document.getElementById('maxHeight').value));
+        document.getElementById('maxWeight').addEventListener('input',()=>holder.Pallets[currentIndex].MaxWeight=parseFloat(document.getElementById('maxWeight').value));
+
+        // elements list
+        function refreshElementList(){
+            const container=document.getElementById('elementsContainer');
+            container.innerHTML='';
+            const elements=holder.Pallets[currentIndex].Elements||[];
+            elements.forEach((el,i)=>{
+                const div=document.createElement('div');
+                div.className='element-row';
+                div.innerHTML=`
+                    <strong>Element ${i}</strong><br/>
+                    X:<input type="number" value="${el.X||0}" step="0.01" data-prop="X" data-index="${i}"/>
+                    Y:<input type="number" value="${el.Y||0}" step="0.01" data-prop="Y" data-index="${i}"/>
+                    Z:<input type="number" value="${el.Z||0}" step="0.01" data-prop="Z" data-index="${i}"/><br/>
+                    W:<input type="number" value="${el.Width}" step="0.01" data-prop="Width" data-index="${i}"/>
+                    H:<input type="number" value="${el.Height}" step="0.01" data-prop="Height" data-index="${i}"/>
+                    D:<input type="number" value="${el.Depth}" step="0.01" data-prop="Depth" data-index="${i}"/><br/>
+                    Weight:<input type="number" value="${el.WeightKg||0}" step="0.1" data-prop="WeightKg" data-index="${i}"/>
+                    <button data-action="rotate" data-index="${i}">Rotate</button>
+                    <button data-action="delete" data-index="${i}">Delete</button>
+                `;
+                container.appendChild(div);
+            });
+
+            // input updates
+            container.querySelectorAll('input').forEach(inp=>{
+                inp.addEventListener('input',()=>{
+                    const idx=parseInt(inp.dataset.index);
+                    const prop=inp.dataset.prop;
+                    holder.Pallets[currentIndex].Elements[idx][prop]=parseFloat(inp.value);
+                    renderPallet(holder.Pallets[currentIndex]);
+                });
+            });
+
+            // rotate/delete
+            container.querySelectorAll('button').forEach(btn=>{
+                btn.addEventListener('click',()=>{
+                    const idx=parseInt(btn.dataset.index);
+                    const action=btn.dataset.action;
+                    if(action==='rotate'){
+                        const el=holder.Pallets[currentIndex].Elements[idx];
+                        [el.Width,el.Depth]=[el.Depth,el.Width];
+                        renderPallet(holder.Pallets[currentIndex]);
+                        refreshElementList();
+                    }else if(action==='delete'){
+                        holder.Pallets[currentIndex].Elements.splice(idx,1);
+                        renderPallet(holder.Pallets[currentIndex]);
+                        refreshElementList();
+                    }
+                });
+            });
+        }
+
+        refreshElementList();
+
+        // add element
+        document.getElementById('addElementBtn').addEventListener('click',()=>{
+            const el={Width:parseFloat(document.getElementById('elWidth').value),
+                      Height:parseFloat(document.getElementById('elHeight').value),
+                      Depth:parseFloat(document.getElementById('elDepth').value),
+                      WeightKg:parseFloat(document.getElementById('elWeight').value),
+                      X:0,Y:0,Z:0};
+            if(!holder.Pallets[currentIndex].Elements) holder.Pallets[currentIndex].Elements=[];
+            holder.Pallets[currentIndex].Elements.push(el);
+            renderPallet(holder.Pallets[currentIndex]);
+            refreshElementList();
+        });
+
+        // save pallet
+        document.getElementById('saveBtn').addEventListener('click',()=>{
+            fetch('/Pallet/UpdatePallet',{
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify(holder.Pallets[currentIndex])
+            }).then(r=>r.json())
+              .then(res=>{if(res.success)console.log('Saved'); else console.error('Save failed');})
+              .catch(err=>console.error(err));
+        });
+
+        // initial render
+        renderPallet(holder.Pallets[currentIndex]);
+    </script>
 </body>
 </html>

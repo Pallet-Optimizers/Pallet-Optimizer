@@ -18,24 +18,24 @@ namespace Pallet_Optimizer.Data
                 {
                     new Pallet
                     {
-                        Id = 0,
+                        Id = Guid.NewGuid().ToString(),
                         Name = "Pallet A",
-                        MaterialType = PALLET_MATERIAL_TYPE.Wood,
+                        MaterialType = 0,
                         Elements = new List<Element>
                         {
-                            new Element { Id = 1, Name = "Box 1"},
-                            new Element { Id = 2, Name = "Box 2"},
-                            new Element { Id = 4, Name = "Box 3"}
+                            new Element { Id = Guid.NewGuid().ToString(), Name = "Box 1"},
+                            new Element { Id = Guid.NewGuid().ToString(), Name = "Box 2"},
+                            new Element { Id = Guid.NewGuid().ToString(), Name = "Box 3"}
                         }
                     },
                     new Pallet
                     {
-                        Id = 1,
+                        Id = Guid.NewGuid().ToString(),
                         Name = "Pallet B",
                         MaterialType = PALLET_MATERIAL_TYPE.Plastic,
                         Elements = new List<Element>
                         {
-                            new Element { Id = 3, Name = "Box 3"}
+                            new Element { Id = Guid.NewGuid().ToString(), Name = "Box 3"}
                         }
                     }
                 },
@@ -45,7 +45,7 @@ namespace Pallet_Optimizer.Data
 
         public Task AddPalletAsync(Pallet pallet)
         {
-            pallet.Id = _holder.Pallets.Any() ? _holder.Pallets.Max(p => p.Id) + 1 : 0;
+            pallet.Id = _holder.Pallets.Any() ? _holder.Pallets.Max(p => p.Id) + 1 : 0.ToString();
             _holder.Pallets.Add(pallet);
             return Task.CompletedTask;
         }

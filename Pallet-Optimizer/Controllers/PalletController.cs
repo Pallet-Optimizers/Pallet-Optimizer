@@ -30,7 +30,7 @@ namespace Pallet_Optimizer.Controllers
             if (pallet == null) return NotFound();
 
             // Apply changes 
-            pallet.MaterialType = dto.MaterialType;
+            pallet.MaterialType = (PALLET_MATERIAL_TYPE)dto.MaterialType;
 
             // If client sends other fields, update them as well
             await _repo.UpdatePalletAsync(dto.Index, pallet);

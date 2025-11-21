@@ -1,19 +1,15 @@
-﻿namespace Pallet_Optimizer.Models
+﻿public class Element
 {
-    public class Measurements
-    {
-        public double? Width { get; set; }
-        public double? Length { get; set; }
-        public double? Height { get; set; } 
+    public string Id { get; set; }
+    public string Name { get; set; }
+    public double Width { get; set; }
+    public double Height { get; set; }
+    public double Depth { get; set; }
+    public double WeightKg { get; set; }
+    public bool CanRotate { get; set; } = true;
+    public bool MustBeAlone { get; set; } = false;
 
-        public double? Weight { get; set; }
-    }
-    public class Element
-    {
-        public Measurements? Measurements { get; set; }
-
-        public string? Name { get; set; }
-
-        public int? Id { get; set; }
-    }
+    // for compatibility with your old optimizer code
+    public (double Width, double Height, double Depth) Size => (Width, Height, Depth);
+    public double FootprintArea => Width * Depth;
 }
