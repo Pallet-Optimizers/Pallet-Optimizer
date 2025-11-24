@@ -23,7 +23,7 @@ namespace Pallet_Optimizer.Controllers
 
         // POST: /Pallet/UpdatePallet
         [HttpPost]
-        public async Task<IActionResult> UpdatePallet(UpdatePalletDto dto)
+        public async Task<IActionResult> UpdatePallet([FromBody] UpdatePalletDto dto)
         {
             var pallet = await _repo.GetPalletAsync(dto.Index);
             if (pallet == null) return NotFound();
@@ -45,18 +45,16 @@ namespace Pallet_Optimizer.Controllers
 
         // POST: /Pallet/AddPallet
         [HttpPost]
-        public async Task<IActionResult> AddPallet(AddPalletDto dto)
+        public async Task<IActionResult> AddPallet([FromBody] AddPalletDto dto)
         {
             var pallet = new Pallet
             {
                 Id = System.Guid.NewGuid().ToString(),
                 Name = dto.Name,
                 MaterialType = dto.MaterialType,
-                Width = 1.2,
-                Length = 0.8,
-                Height = 0.15,
-                MaxHeight = 2.0,
-                MaxWeight = 1000
+                Width = dto.Width,
+                Length = dto.Length,
+                Height = dto.Height,
             };
 
             await _repo.AddPalletAsync(pallet);
@@ -64,8 +62,9 @@ namespace Pallet_Optimizer.Controllers
         }
 
         // POST: /Pallet/DeletePallet
+        
         [HttpPost]
-        public async Task<IActionResult> DeletePallet(DeletePalletDto dto)
+        public async Task<IActionResult> DeletePallet([FromBody] DeletePalletDto dto)
         {
             await _repo.DeletePalletAsync(dto.Index);
             return Json(new { success = true, index = dto.Index });
@@ -73,7 +72,7 @@ namespace Pallet_Optimizer.Controllers
 
         // POST: /Pallet/AddElement
         [HttpPost]
-        public async Task<IActionResult> AddElement(AddElementDto dto)
+        public async Task<IActionResult> AddElement([FromBody] AddElementDto dto)
         {
             var pallet = await _repo.GetPalletAsync(dto.PalletId);
             if (pallet == null) return NotFound();
@@ -85,7 +84,7 @@ namespace Pallet_Optimizer.Controllers
                 Width = dto.Width,
                 Height = dto.Height,
                 Depth = dto.Depth,
-                WeightKg = dto.WeightKg,
+                Weight = dto.Weight,
                 CanRotate = dto.CanRotate,
                 MustBeAlone = dto.MustBeAlone
             };
@@ -123,6 +122,10 @@ namespace Pallet_Optimizer.Controllers
     public class AddPalletDto
     {
         public string Name { get; set; } = "";
+        public int Width { get; set; }
+        public int Length { get; set; }
+        public int Weight { get; set; }
+        public int Height { get; set; }
         public PALLET_MATERIAL_TYPE MaterialType { get; set; } = PALLET_MATERIAL_TYPE.Wood;
     }
 
@@ -138,7 +141,7 @@ namespace Pallet_Optimizer.Controllers
         public double Width { get; set; }
         public double Height { get; set; }
         public double Depth { get; set; }
-        public double WeightKg { get; set; }
+        public double Weight { get; set; }
         public bool CanRotate { get; set; } = true;
         public bool MustBeAlone { get; set; } = false;
     }
