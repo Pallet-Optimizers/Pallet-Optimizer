@@ -2,6 +2,7 @@
 using Pallet_Optimizer.Data;
 using Pallet_Optimizer.Models;
 using System.Threading.Tasks;
+using Pallet_Optimizer.Filters;
 
 namespace Pallet_Optimizer.Controllers
 {
