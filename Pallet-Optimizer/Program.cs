@@ -9,16 +9,12 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(
         builder.Configuration.GetConnectionString("DefaultConnection")));
 
-builder.Services.AddScoped<IPalletRepository, EfPalletRepository>();
+// register both concrete repositories and expose the hybrid as IPalletRepository
+builder.Services.AddScoped<InMemoryPalletRepository>();
+builder.Services.AddScoped<EfPalletRepository>();
+builder.Services.AddScoped<IPalletRepository, HybridPalletRepository>();
 
 var app = builder.Build();
-
-// DO NOT call Migrate() when you only want to use an existing DB.
-// using (var scope = app.Services.CreateScope())
-// {
-//     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-//     db.Database.Migrate();
-// }
 
 app.UseStaticFiles();
 app.UseRouting();

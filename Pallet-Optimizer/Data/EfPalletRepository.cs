@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -27,7 +28,6 @@ namespace Pallet_Optimizer.Data {
         }
 
         public async Task<Pallet?> GetPalletAsync(string index) {
-            // index is a string id in domain; DB uses integer key
             if (!int.TryParse(index, out var pid)) return null;
 
             var db = await _context.Set<PalletDb>()
@@ -41,6 +41,17 @@ namespace Pallet_Optimizer.Data {
             var db = pallet.ToDb();
             await _context.Set<PalletDb>().AddAsync(db);
             await _context.SaveChangesAsync();
+
+            // Important: update the domain object's Id with the generated DB identity
+            // so subsequent calls using the domain Id can be resolved to the DB row.
+            pallet.Id = db.PalletId.ToString();
+
+            // ensure any element FK values reflect the assigned pallet id
+            if (pallet.Elements != null) {
+                foreach (var el in pallet.Elements) {
+                    el.PalletId = pallet.Id;
+                }
+            }
         }
 
         public async Task UpdatePalletAsync(string index, Pallet updated) {
@@ -51,7 +62,6 @@ namespace Pallet_Optimizer.Data {
                 .FirstOrDefaultAsync(p => p.PalletId == pid);
             if (db == null) return;
 
-            // update simple properties
             db.Type = updated.Name;
             db.Width = Convert.ToDecimal(updated.Width);
             db.Length = Convert.ToDecimal(updated.Length);
@@ -59,13 +69,8 @@ namespace Pallet_Optimizer.Data {
             db.MaxHeight = Convert.ToDecimal(updated.MaxHeight);
             db.MaxWeight = Convert.ToDecimal(updated.MaxWeight);
             db.Active = !updated.IsSpecial;
-
-            // Persist material selection to the DB FK column (enum -> DB id mapping).
-            // Matches PalletMappers.ToDb which does: MaterialId = (int)domain.MaterialType + 1
             db.MaterialId = (int)updated.MaterialType + 1;
 
-            // replace elements: remove existing placements/elements as appropriate then add new
-            // simple approach: remove existing Element rows that belong to this pallet and re-add
             var existingElements = db.Elements?.ToList() ?? new List<ElementDb>();
             if (existingElements.Any()) {
                 _context.Set<ElementDb>().RemoveRange(existingElements);
