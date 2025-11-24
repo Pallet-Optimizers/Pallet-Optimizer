@@ -96,7 +96,7 @@ namespace Pallet_Optimizer.Controllers
                 Width = dto.Width,
                 Height = dto.Height,
                 Depth = dto.Depth,
-                Weightkg = dto.Weight,
+                WeightKg = dto.Weight,
                 CanRotate = dto.CanRotate,
                 MustBeAlone = dto.MustBeAlone
             };

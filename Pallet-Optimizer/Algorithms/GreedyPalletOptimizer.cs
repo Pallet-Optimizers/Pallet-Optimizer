@@ -16,7 +16,7 @@
         // Sort elements: special first, then by weight descending, then height descending
         var sorted = elements
             .OrderByDescending(e => e.MustBeAlone)
-            .ThenByDescending(e => e.Weightkg)
+            .ThenByDescending(e => e.WeightKg)
             .ThenByDescending(e => e.Height)
             .ToList();
 
@@ -63,9 +63,9 @@
 
         if (pallet.CurrentHeight + el.Height > settings.MaxPalletHeight) return false;
 
-        if (el.Weightkg > settings.MaxWeightPerElement) return false;
+        if (el.WeightKg > settings.MaxWeightPerElement) return false;
 
-        if (pallet.CurrentWeight + el.Weightkg > pallet.MaxWeight) return false;
+        if (pallet.CurrentWeight + el.WeightKg > pallet.MaxWeight) return false;
 
         return true;
     }

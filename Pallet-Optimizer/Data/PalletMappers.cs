@@ -64,7 +64,7 @@ namespace Pallet_Optimizer.Data
                 Width = (double)db.Width,
                 Height = (double)db.Height,
                 Depth = (double)db.Depth,
-                Weightkg = (double)db.Weight,
+                WeightKg = (double)db.Weight,
                 CanRotate = db.CanRotate,
                 MustBeAlone = false,
                 PalletId = db.PalletId?.ToString() ?? string.Empty
@@ -106,7 +106,7 @@ namespace Pallet_Optimizer.Data
                 Width = Convert.ToDecimal(domain.Width),
                 Height = Convert.ToDecimal(domain.Height),
                 Depth = Convert.ToDecimal(domain.Depth),
-                Weight = Convert.ToDecimal(domain.Weightkg),
+                Weight = Convert.ToDecimal(domain.WeightKg),
                 CanRotate = domain.CanRotate,
                 Brand = domain.Name,
                 PalletId = TryParseNullableInt(domain.PalletId)
