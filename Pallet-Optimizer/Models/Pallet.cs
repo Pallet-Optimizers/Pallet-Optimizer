@@ -17,7 +17,7 @@ public class Pallet
     public List<Element> Elements { get; set; } = new List<Element>();
 
     public double CurrentHeightMm => Elements.Sum(e => e.Height);
-    public double CurrentWeightKg => Elements.Sum(e => e.Weight);
+    public double CurrentWeightKg => Elements.Sum(e => e.Weightkg);
     public double UsedArea => Elements.Sum(e => e.FootprintArea);
     public double FootprintArea => Length * Width;
 

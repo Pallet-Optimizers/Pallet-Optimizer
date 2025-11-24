@@ -169,10 +169,24 @@
         <div class="control-row">
             <label>Select Pallet</label>
             <select id="palletSelect">
-                @for (int i = 0; i < (Model?.Pallets?.Count ?? 0); i++)
+                @if (Model?.Pallets != null)
                 {
-                    var p = Model.Pallets[i];
-                    <option value="@i" data-id="@p.Id" selected="@(i == currentIndex)">@p.Name (@p.Id)</option>
+                    for (int i = 0; i < Model.Pallets.Count; i++)
+                    {
+                        var p = Model.Pallets[i];
+                        if (i == currentIndex)
+                        {
+                            <option value="@i" data-id="@p.Id" selected="selected">@p.Name (@p.Id)</option>
+                        }
+                        else
+                        {
+                            <option value="@i" data-id="@p.Id">@p.Name (@p.Id)</option>
+                        }
+                    }
+                }
+                else
+                {
+                    <option value="0">No pallets</option>
                 }
             </select>
         </div>
@@ -180,9 +194,9 @@
         <div class="control-row">
             <label>Material Type</label>
             <select id="materialSelect">
-                @foreach (var val in Enum.GetValues(typeof(Pallet_Optimizer.Models.PALLET_MATERIAL_TYPE)))
+                @foreach (Pallet_Optimizer.Models.PALLET_MATERIAL_TYPE material in Enum.GetValues(typeof(Pallet_Optimizer.Models.PALLET_MATERIAL_TYPE)))
                 {
-                    <option value="@val">@val</option>
+                    <option value="@( (int)material )">@material</option>
                 }
             </select>
         </div>
@@ -252,9 +266,9 @@
             <input type="text" id="addName" placeholder="Enter name..." />
             <label style="margin-top:6px;">Material:</label>
             <select id="addMaterial">
-                @foreach (var val in Enum.GetValues(typeof(Pallet_Optimizer.Models.PALLET_MATERIAL_TYPE)))
+                @foreach (Pallet_Optimizer.Models.PALLET_MATERIAL_TYPE material in Enum.GetValues(typeof(Pallet_Optimizer.Models.PALLET_MATERIAL_TYPE)))
                 {
-                    <option value="@val">@val</option>
+                    <option value="@( (int)material )">@material</option>
                 }
             </select>
             <button id="addPalletBtn" style="margin-top:8px; width:100%;">Add Pallet</button>
@@ -301,9 +315,9 @@
             <input type="text" id="editName" />
             <label>Material:</label>
             <select id="editMaterial">
-                @foreach (var val in Enum.GetValues(typeof(Pallet_Optimizer.Models.PALLET_MATERIAL_TYPE)))
+                @foreach (Pallet_Optimizer.Models.PALLET_MATERIAL_TYPE material in Enum.GetValues(typeof(Pallet_Optimizer.Models.PALLET_MATERIAL_TYPE)))
                 {
-                    <option value="@val">@val</option>
+                    <option value="@( (int)material )">@material</option>
                 }
             </select>
             <div style="margin-top:8px;">
@@ -463,7 +477,7 @@
 
                 const materialSelect = document.getElementById('materialSelect');
                 if (materialSelect) {
-                    materialSelect.value = pallet.MaterialType || 0;
+                    materialSelect.value = String(pallet.MaterialType ?? 0);
                 }
 
                 updateElementsList(pallet);
@@ -548,7 +562,7 @@
                 }
 
                 const dto = {
-                    Id: palletId,
+                    PalletId: palletId,
                     Name: name,
                     Width: parseFloat(document.getElementById('elementWidth').value),
                     Height: parseFloat(document.getElementById('elementHeight').value),
@@ -602,7 +616,7 @@
                         const res = await fetch('/Pallet/RemoveElement', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ palletId, elementId })
+                            body: JSON.stringify({ PalletId: palletId, ElementId: elementId })
                         });
 
                         if (!res.ok) {
@@ -658,7 +672,7 @@
                         const p = await res.json();
                         document.getElementById('editId').value = p.Id;
                         document.getElementById('editName').value = p.Name || '';
-                        document.getElementById('editMaterial').value = p.MaterialType;
+                        document.getElementById('editMaterial').value = String(p.MaterialType ?? 0);
                         document.getElementById('editor').style.display = 'block';
                     } catch (err) {
                         alert('Error: ' + err.message);
@@ -745,7 +759,7 @@
                     const res = await fetch('/Pallet/AddPallet', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ name, materialType })
+                        body: JSON.stringify({ Name: name, MaterialType: materialType })
                     });
                     if (!res.ok) {
                         alert('Add failed');

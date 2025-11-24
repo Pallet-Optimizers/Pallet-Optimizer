@@ -2,6 +2,9 @@
 using Pallet_Optimizer.Data;
 using Pallet_Optimizer.Models;
 using System.Threading.Tasks;
+using System.Linq;
+using System.Text.Json.Serialization;
+using System.Collections.Generic;
 
 namespace Pallet_Optimizer.Controllers
 {
@@ -25,13 +28,16 @@ namespace Pallet_Optimizer.Controllers
         [HttpPost]
         public async Task<IActionResult> UpdatePallet([FromBody] UpdatePalletDto dto)
         {
+            if (dto == null) return BadRequest(new { success = false, error = "Request body is required" });
+
             var pallet = await _repo.GetPalletAsync(dto.Index);
             if (pallet == null) return NotFound();
 
             pallet.MaterialType = dto.MaterialType;
             await _repo.UpdatePalletAsync(dto.Index, pallet);
 
-            return Json(new { success = true, index = dto.Index, material = pallet.MaterialType.ToString() });
+            // include name & material so client can update UI
+            return Json(new { success = true, index = dto.Index, material = pallet.MaterialType.ToString(), name = pallet.Name });
         }
 
         // GET pallet data endpoint
@@ -47,6 +53,8 @@ namespace Pallet_Optimizer.Controllers
         [HttpPost]
         public async Task<IActionResult> AddPallet([FromBody] AddPalletDto dto)
         {
+            if (dto == null) return BadRequest(new { success = false, error = "Request body is required" });
+
             var pallet = new Pallet
             {
                 Id = System.Guid.NewGuid().ToString(),
@@ -55,6 +63,7 @@ namespace Pallet_Optimizer.Controllers
                 Width = dto.Width,
                 Length = dto.Length,
                 Height = dto.Height,
+                Elements = new List<Element>()
             };
 
             await _repo.AddPalletAsync(pallet);
@@ -62,10 +71,11 @@ namespace Pallet_Optimizer.Controllers
         }
 
         // POST: /Pallet/DeletePallet
-        
         [HttpPost]
         public async Task<IActionResult> DeletePallet([FromBody] DeletePalletDto dto)
         {
+            if (dto == null) return BadRequest(new { success = false, error = "Request body is required" });
+
             await _repo.DeletePalletAsync(dto.Index);
             return Json(new { success = true, index = dto.Index });
         }
@@ -74,6 +84,8 @@ namespace Pallet_Optimizer.Controllers
         [HttpPost]
         public async Task<IActionResult> AddElement([FromBody] AddElementDto dto)
         {
+            if (dto == null) return BadRequest(new { success = false, error = "Request body is required" });
+
             var pallet = await _repo.GetPalletAsync(dto.PalletId);
             if (pallet == null) return NotFound();
 
@@ -84,11 +96,12 @@ namespace Pallet_Optimizer.Controllers
                 Width = dto.Width,
                 Height = dto.Height,
                 Depth = dto.Depth,
-                Weight = dto.Weight,
+                Weightkg = dto.Weight,
                 CanRotate = dto.CanRotate,
                 MustBeAlone = dto.MustBeAlone
             };
 
+            pallet.Elements ??= new List<Element>();
             pallet.Elements.Add(element);
             await _repo.UpdatePalletAsync(dto.PalletId, pallet);
 
@@ -97,11 +110,14 @@ namespace Pallet_Optimizer.Controllers
 
         // POST: /Pallet/RemoveElement
         [HttpPost]
-        public async Task<IActionResult> RemoveElement(RemoveElementDto dto)
+        public async Task<IActionResult> RemoveElement([FromBody] RemoveElementDto dto)
         {
+            if (dto == null) return BadRequest(new { success = false, error = "Request body is required" });
+
             var pallet = await _repo.GetPalletAsync(dto.PalletId);
             if (pallet == null) return NotFound();
 
+            pallet.Elements ??= new List<Element>();
             var element = pallet.Elements.FirstOrDefault(e => e.Id == dto.ElementId);
             if (element != null)
             {
@@ -116,6 +132,9 @@ namespace Pallet_Optimizer.Controllers
     public class UpdatePalletDto
     {
         public string Index { get; set; } = "";
+
+        // accept string enum values (e.g. "Plastic") as well as numeric enum values
+        [JsonConverter(typeof(JsonStringEnumConverter))]
         public PALLET_MATERIAL_TYPE MaterialType { get; set; }
     }
 
@@ -126,6 +145,9 @@ namespace Pallet_Optimizer.Controllers
         public int Length { get; set; }
         public int Weight { get; set; }
         public int Height { get; set; }
+
+        // accept string enum values (e.g. "Plastic") as well as numeric enum values
+        [JsonConverter(typeof(JsonStringEnumConverter))]
         public PALLET_MATERIAL_TYPE MaterialType { get; set; } = PALLET_MATERIAL_TYPE.Wood;
     }
 
