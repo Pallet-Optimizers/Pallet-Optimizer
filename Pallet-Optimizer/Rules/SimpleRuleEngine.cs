@@ -14,7 +14,7 @@
             placement = null;
 
             // 1. Weight
-            if (pallet.CurrentWeightKg + el.WeightKg > pallet.MaxWeight)
+            if (pallet.CurrentWeightKg + el.Weight > pallet.MaxWeight)
                 return false;
 
             // 2. Height

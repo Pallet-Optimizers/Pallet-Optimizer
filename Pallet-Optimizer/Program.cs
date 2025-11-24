@@ -6,7 +6,7 @@ builder.Services.AddControllersWithViews()
     .AddJsonOptions(options =>
     {
         // Force PascalCase for JSON (matches C# property names)
-        options.JsonSerializerOptions.PropertyNamingPolicy = null;
+        //options.JsonSerializerOptions.PropertyNamingPolicy = null;
     });
 
 builder.Services.AddSingleton<IPalletRepository, InMemoryPalletRepository>();
