@@ -645,7 +645,7 @@
                         alert('Error: ' + err.message);
                     }
                 }
-
+ 
                 // ========== EDIT PALLET ==========
                 if (e.target.matches('.btn-edit')) {
                     const id = e.target.dataset.id;
@@ -695,13 +695,18 @@
             // ========== SAVE PALLET EDIT ==========
             document.getElementById('savePalletBtn').addEventListener('click', async function () {
                 const id = document.getElementById('editId').value;
+                const name = document.getElementById('editName').value;
                 const materialType = parseInt(document.getElementById('editMaterial').value);
                 
                 try {
                     const res = await fetch('/Pallet/UpdatePallet', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ index: id, materialType })
+                        body: JSON.stringify({ 
+                            Index: id,
+                            Name: name,
+                            MaterialType: materialType 
+                        })
                     });
                     if (!res.ok) {
                         alert('Update failed');
@@ -711,6 +716,7 @@
                     
                     const row = document.querySelector(`tr[data-id="${id}"]`);
                     if (row) {
+                        row.querySelector('.name').textContent = json.name;
                         row.querySelector('.material').textContent = json.material;
                     }
                     document.getElementById('editor').style.display = 'none';
