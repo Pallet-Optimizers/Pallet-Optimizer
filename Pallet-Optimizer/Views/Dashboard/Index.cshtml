@@ -71,24 +71,25 @@
                             </div>
                         </div>
                         <div class="card-footer p-2 bg-light">
-                            <div class="d-flex gap-1 justify-content-center">
+                            <div class="d-grid gap-2">
                                 <a asp-action="EditPlan" asp-route-id="@plan.Id"
-                                   class="btn btn-sm btn-outline-primary flex-fill"
-                                   title="Rediger pakkeplan">
-                                    <i class="bi bi-pencil"></i>
+                                   class="btn btn-sm btn-primary w-100">
+                                    <i class="bi bi-pencil"></i> Rediger
                                 </a>
-                                <a asp-controller="Dashboard" asp-action="Settings" asp-route-id="@plan.Id"
-                                   class="btn btn-sm btn-outline-secondary flex-fill"
-                                   title="Indstillinger">
-                                    <i class="bi bi-gear"></i>
-                                </a>
-                                <button type="button"
-                                        class="btn btn-sm btn-outline-danger flex-fill"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#deletePlanModal-@plan.Id"
-                                        title="Slet pakkeplan">
-                                    <i class="bi bi-trash"></i>
-                                </button>
+                                <div class="btn-group w-100" role="group">
+                                    <a asp-controller="Dashboard" asp-action="Settings" asp-route-id="@plan.Id"
+                                       class="btn btn-sm btn-outline-secondary"
+                                       style="font-size: 0.75rem;">
+                                        <i class="bi bi-gear"></i> Indstillinger
+                                    </a>
+                                    <button type="button"
+                                            class="btn btn-sm btn-outline-danger"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#deletePlanModal-@plan.Id"
+                                            style="font-size: 0.75rem;">
+                                        <i class="bi bi-trash"></i> Slet
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -157,30 +158,19 @@
         document.getElementById('searchInput').addEventListener('input', function() {
             const searchTerm = this.value.toLowerCase().trim();
             const planCards = document.querySelectorAll('.plan-card');
-            const noResults = document.getElementById('noResults');
-            let visibleCount = 0;
+            let anyVisible = false;
 
-            planCards.forEach(card => {
-                const planName = card.getAttribute('data-plan-name');
-                if (planName.includes(searchTerm)) {
-                    card.classList.remove('d-none');
-                    visibleCount++;
+            planCards.forEach(function(card) {
+                const name = card.getAttribute('data-plan-name');
+                if (name.includes(searchTerm)) {
+                    card.style.display = '';
+                    anyVisible = true;
                 } else {
-                    card.classList.add('d-none');
+                    card.style.display = 'none';
                 }
             });
 
-            // Show/hide no results message
-            if (visibleCount === 0 && searchTerm !== '') {
-                noResults.classList.remove('d-none');
-            } else {
-                noResults.classList.add('d-none');
-            }
-        });
-
-        // Clear search on modal open
-        document.getElementById('createPlanModal').addEventListener('show.bs.modal', function() {
-            document.getElementById('planName').value = '';
+            document.getElementById('noResults').classList.toggle('d-none', anyVisible);
         });
     </script>
 }
