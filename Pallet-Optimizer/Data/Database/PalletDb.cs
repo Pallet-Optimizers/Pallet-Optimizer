@@ -20,6 +20,9 @@ public partial class PalletDb
 
     public decimal MaxWeight { get; set; }
 
+    // Added to match the actual database column name "WeightKg".
+    public decimal WeightKg { get; set; }
+
     public string? PalletSize { get; set; }
 
     public string? Type { get; set; }

@@ -39,14 +39,15 @@ namespace Pallet_Optimizer.Data {
 
         public async Task AddPalletAsync(Pallet pallet) {
             var db = pallet.ToDb();
+
+            // Only update persisted WeightKg — pallet dimensions must remain as provided.
+            db.RecalculateWeightKg();
+
             await _context.Set<PalletDb>().AddAsync(db);
             await _context.SaveChangesAsync();
 
-            // Important: update the domain object's Id with the generated DB identity
-            // so subsequent calls using the domain Id can be resolved to the DB row.
             pallet.Id = db.PalletId.ToString();
 
-            // ensure any element FK values reflect the assigned pallet id
             if (pallet.Elements != null) {
                 foreach (var el in pallet.Elements) {
                     el.PalletId = pallet.Id;
@@ -77,6 +78,9 @@ namespace Pallet_Optimizer.Data {
             }
 
             db.Elements = updated.Elements?.Select(e => e.ToDb()).ToList() ?? new List<ElementDb>();
+
+            // Only recalculate WeightKg here so pallet dimensions remain unchanged.
+            db.RecalculateWeightKg();
 
             await _context.SaveChangesAsync();
         }
