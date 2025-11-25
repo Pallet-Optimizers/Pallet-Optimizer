@@ -32,7 +32,7 @@ namespace Pallet_Optimizer.Controllers
             if (user != null)
             {
                 HttpContext.Session.SetString("Username", user.Username);
-                return RedirectToAction("Index", "Pallet");
+                return RedirectToAction("Index", "Dashboard");
             }
 
             ModelState.AddModelError("", "Ugyldigt brugernavn eller password");

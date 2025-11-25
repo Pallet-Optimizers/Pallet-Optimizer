@@ -10,6 +10,12 @@ namespace Pallet_Optimizer.Data
         Task<Pallet> GetPalletAsync(int index);
         Task UpdatePalletAsync(int index, Pallet updated);
         Task AddPalletAsync(Pallet pallet);
-       // Task SaveChangesAsync(); 
+
+        // New methods for package plan management
+        Task<List<PackagePlanViewModel>> GetAllPackagePlansAsync();
+        Task<PalletHolder> GetPackagePlanByIdAsync(string id);
+        Task<string> CreatePackagePlanAsync(string name);
+        Task<bool> DeletePackagePlanAsync(string id);
+        Task<bool> UpdatePackagePlanAsync(string id, PalletHolder holder);
     }
 }
