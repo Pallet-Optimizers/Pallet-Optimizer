@@ -6,6 +6,7 @@ using Pallet_Optimizer.Filters;
 
 namespace Pallet_Optimizer.Controllers
 {
+    [AuthorizeSession]
     public class PalletController : Controller
     {
         private readonly IPalletRepository _repo;
@@ -15,31 +16,42 @@ namespace Pallet_Optimizer.Controllers
             _repo = repo;
         }
 
-        // GET: /Pallet
-        public async Task<IActionResult> Index()
+        // GET: /Pallet?planId=xxx
+        public async Task<IActionResult> Index(string? planId)
         {
-            var holder = await _repo.GetHolderAsync();
+            PalletHolder holder;
+
+            if (!string.IsNullOrEmpty(planId))
+            {
+                holder = await _repo.GetPackagePlanByIdAsync(planId);
+                if (holder == null)
+                {
+                    TempData["Error"] = "Pakkeplan ikke fundet";
+                    return RedirectToAction("Index", "Dashboard");
+                }
+            }
+            else
+            {
+                holder = await _repo.GetHolderAsync();
+            }
+
             return View(holder);
         }
 
         // POST: /Pallet/UpdatePallet
-        // Accept JSON body from AJAX to avoid full page reload
         [HttpPost]
         public async Task<IActionResult> UpdatePallet(UpdatePalletDto dto)
         {
             var pallet = await _repo.GetPalletAsync(dto.Index);
             if (pallet == null) return NotFound();
 
-            // Apply changes 
             pallet.MaterialType = (PALLET_MATERIAL_TYPE)dto.MaterialType;
-
-            // If client sends other fields, update them as well
             await _repo.UpdatePalletAsync(dto.Index, pallet);
 
             return Json(new { success = true, index = dto.Index, material = pallet.MaterialType.ToString() });
         }
 
-        // GET pallet data endpoint (for client-side)
+        // GET: /Pallet/GetPallet
         [HttpGet]
         public async Task<IActionResult> GetPallet(int index)
         {
@@ -49,7 +61,6 @@ namespace Pallet_Optimizer.Controllers
         }
     }
 
-    // TODO: Add more data here
     public class UpdatePalletDto
     {
         public int Index { get; set; }

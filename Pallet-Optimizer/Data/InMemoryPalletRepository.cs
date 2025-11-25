@@ -7,10 +7,13 @@ namespace Pallet_Optimizer.Data
 {
     public class InMemoryPalletRepository : IPalletRepository
     {
+        private readonly Dictionary<string, PackagePlan> _packagePlans;
         private readonly PalletHolder _holder;
 
         public InMemoryPalletRepository()
         {
+            _packagePlans = new Dictionary<string, PackagePlan>();
+            
             // sample seed data
             _holder = new PalletHolder
             {
@@ -56,9 +59,6 @@ namespace Pallet_Optimizer.Data
             return Task.FromResult(pallet);
         }
 
-  
-
-
         public Task<PalletHolder> GetHolderAsync()
         {
             return Task.FromResult(_holder);
@@ -74,6 +74,78 @@ namespace Pallet_Optimizer.Data
                 existing.Elements = updated.Elements ?? new List<Element>();
             }
             return Task.CompletedTask;
+        }
+
+        public Task<List<PackagePlanViewModel>> GetAllPackagePlansAsync()
+        {
+            var viewModels = _packagePlans.Select(kvp => new PackagePlanViewModel
+            {
+                Id = kvp.Key,
+                Name = kvp.Value.Name,
+                CreatedDate = kvp.Value.CreatedDate,
+                LastModified = kvp.Value.LastModified,
+                PalletCount = kvp.Value.Holder.Pallets.Count,
+                TotalElements = kvp.Value.Holder.Pallets.Sum(p => p.Elements.Count),
+                TotalWeight = kvp.Value.Holder.Pallets.Sum(p => p.CurrentWeightKg)
+            }).ToList();
+
+            return Task.FromResult(viewModels);
+        }
+
+        public Task<PalletHolder> GetPackagePlanByIdAsync(string id)
+        {
+            if (_packagePlans.TryGetValue(id, out var plan))
+            {
+                return Task.FromResult(plan.Holder);
+            }
+            return Task.FromResult<PalletHolder>(null);
+        }
+
+        public Task<string> CreatePackagePlanAsync(string name)
+        {
+            var id = Guid.NewGuid().ToString();
+            var plan = new PackagePlan
+            {
+                Id = id,
+                Name = name,
+                CreatedDate = DateTime.Now,
+                LastModified = DateTime.Now,
+                Holder = new PalletHolder
+                {
+                    Pallets = new List<Pallet>(),
+                    CurrentPalletIndex = 0
+                }
+            };
+
+            _packagePlans[id] = plan;
+            return Task.FromResult(id);
+        }
+
+        public Task<bool> DeletePackagePlanAsync(string id)
+        {
+            var removed = _packagePlans.Remove(id);
+            return Task.FromResult(removed);
+        }
+
+        public Task<bool> UpdatePackagePlanAsync(string id, PalletHolder holder)
+        {
+            if (_packagePlans.TryGetValue(id, out var plan))
+            {
+                plan.Holder = holder;
+                plan.LastModified = DateTime.Now;
+                return Task.FromResult(true);
+            }
+            return Task.FromResult(false);
+        }
+
+        // Internal class to hold package plan data
+        private class PackagePlan
+        {
+            public string Id { get; set; }
+            public string Name { get; set; }
+            public DateTime CreatedDate { get; set; }
+            public DateTime LastModified { get; set; }
+            public PalletHolder Holder { get; set; }
         }
     }
 }
