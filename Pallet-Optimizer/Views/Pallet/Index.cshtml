@@ -545,64 +545,79 @@
     <script>
         // ========== CRUD OPERATIONS ==========
         (function () {
-            function getCurrentPalletId() {
-                const select = document.getElementById('palletSelect');
-                const option = select.options[select.selectedIndex];
-                return option.getAttribute('data-id');
-            }
 
-            // ========== ADD ELEMENT ==========
-            document.getElementById('addElementBtn').addEventListener('click', async function () {
-                const palletId = getCurrentPalletId();
-                const name = document.getElementById('elementName').value.trim();
-                
-                if (!name) {
-                    alert('Please enter an element name');
-                    return;
-                }
+        function getCurrentPalletId() {
+            const select = document.getElementById('palletSelect');
+            const option = select.options[select.selectedIndex];
+            return option.getAttribute('data-id'); // KEEP AS STRING
+        }
+
+
+          // ========== ADD ELEMENT ==========
+          document.getElementById('addElementBtn').addEventListener('click', async function () {
+
+              const palletId = getCurrentPalletId();
+              const name = document.getElementById('elementName').value.trim();
+
+              if (!name) {
+                  alert('Please enter an element name');
+                  return;
+              }
 
                 const dto = {
-                    PalletId: palletId,
+                    PalletId: palletId,             // string
                     Name: name,
-                    Width: parseFloat(document.getElementById('elementWidth').value),
-                    Height: parseFloat(document.getElementById('elementHeight').value),
-                    Depth: parseFloat(document.getElementById('elementDepth').value),
-                    Weight: parseFloat(document.getElementById('elementWeight').value),
+                    Width: Number(document.getElementById('elementWidth').value),
+                    Height: Number(document.getElementById('elementHeight').value),
+                    Depth: Number(document.getElementById('elementDepth').value),
+                    WeightKg: Number(document.getElementById('elementWeight').value), // matches C# property
                     CanRotate: document.getElementById('elementCanRotate').checked,
                     MustBeAlone: document.getElementById('elementMustBeAlone').checked
                 };
 
-                try {
-                    const res = await fetch('/Pallet/AddElement', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(dto)
-                    });
+                console.log("WEIGHT: " + dto.WeightKg);
 
-                    if (!res.ok) {
-                        alert('Failed to add element');
-                        return;
-                    }
 
-                    const json = await res.json();
-                    if (json.success) {
-                        // Update local data
-                        window.__PalletHolder.Pallets.find(p => p.Id === palletId).Elements = json.pallet.Elements;
-                        
-                        // Refresh visualization
-                        const select = document.getElementById('palletSelect');
-                        window.loadPallet(parseInt(select.value));
-                        
-                        // Reset form
-                        document.getElementById('elementName').value = '';
-                        
-                        alert('Element added successfully!');
-                    }
-                } catch (err) {
-                    console.error('Error:', err);
-                    alert('Error adding element: ' + err.message);
-                }
-            });
+
+              try {
+                  const res = await fetch('/Pallet/AddElement', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json'},
+                      body: JSON.stringify(dto)
+                  });
+
+                  if (!res.ok) {
+                      alert('Failed to add element');
+                      return;
+                  }
+
+                  const json = await res.json();
+
+                  if (json.success && json.pallets) {
+
+                      // ===== FIX: safe lookup and correct ID type =====
+                      const pallet = window.__PalletHolder.Pallets.find(p => p.Id === palletId);
+                    window.__PalletHolder.Pallets = json.pallets;
+
+                    console.log('Updated pallets:', window.__PalletHolder.Pallets);
+
+
+
+                    // Refresh currently selected pallet
+                    const select = document.getElementById('palletSelect');
+                    window.loadPallet(parseInt(select.value));
+
+                    // Reset form
+                    document.getElementById('elementName').value = '';
+
+                      alert('Element added successfully!');
+                  }
+
+              } catch (err) {
+                  console.error('Error:', err);
+                  alert('Error adding element: ' + err.message);
+              }
+          });
 
             // ========== REMOVE ELEMENT ==========
             document.addEventListener('click', async function (e) {

@@ -92,20 +92,26 @@ namespace Pallet_Optimizer.Controllers
             var element = new Element
             {
                 Id = System.Guid.NewGuid().ToString(),
+                PalletId = dto.PalletId,
                 Name = dto.Name,
                 Width = dto.Width,
                 Height = dto.Height,
                 Depth = dto.Depth,
-                WeightKg = dto.Weight,
+                WeightKg = dto.WeightKg,
                 CanRotate = dto.CanRotate,
                 MustBeAlone = dto.MustBeAlone
             };
-
+            Console.WriteLine($"Adding element: {element.Name}, Size: {element.Width}x{element.Height}x{element.Depth}, Weight: {dto.WeightKg}kg");
             pallet.Elements ??= new List<Element>();
             pallet.Elements.Add(element);
             await _repo.UpdatePalletAsync(dto.PalletId, pallet);
 
-            return Json(new { success = true, element, pallet });
+            List<Pallet> pallets = GreedyPalletOptimizer.Optimize(pallet.Elements, pallet, new OptimizationSettings());
+            foreach(var pall in pallets)
+            {
+                await _repo.UpdatePalletAsync(pall.Id, pall);
+            }
+            return Json(new { success = true, element, pallets });
         }
 
         // POST: /Pallet/RemoveElement
@@ -163,7 +169,7 @@ namespace Pallet_Optimizer.Controllers
         public double Width { get; set; }
         public double Height { get; set; }
         public double Depth { get; set; }
-        public double Weight { get; set; }
+        public double WeightKg { get; set; }
         public bool CanRotate { get; set; } = true;
         public bool MustBeAlone { get; set; } = false;
     }

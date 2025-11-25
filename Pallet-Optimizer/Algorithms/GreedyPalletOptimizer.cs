@@ -1,6 +1,8 @@
-﻿public class GreedyPalletOptimizer
+﻿using Pallet_Optimizer.Models.Globals;
+
+public static class GreedyPalletOptimizer
 {
-    public List<Pallet> Optimize(List<Element> elements, Pallet defaultPallet, OptimizationSettings settings)
+    public static List<Pallet> Optimize(List<Element> elements, Pallet defaultPallet, OptimizationSettings settings)
     {
         var pallets = new List<Pallet>();
         pallets.Add(new Pallet
@@ -9,7 +11,8 @@
             Width = defaultPallet.Width,
             Height = defaultPallet.Height,
             Length = defaultPallet.Length,
-            MaxWeight = defaultPallet.MaxWeight,
+            CurrentWeight = defaultPallet.CurrentWeight,
+            MaxWeight = Globals.MAX_WEIGHT,
             IsSpecial = defaultPallet.IsSpecial
         });
 
@@ -28,7 +31,10 @@
             {
                 if (CanPlace(element, pallet, settings))
                 {
+                    Console.WriteLine($"Placing element {element.Name} on pallet {pallet.Id}" + pallet.CurrentWeight + " nigger " + element.WeightKg);
                     pallet.Elements.Add(element);
+                    pallet.CurrentWeight += element.WeightKg;
+                    
                     placed = true;
                     break;
                 }
@@ -39,15 +45,23 @@
                 var newPallet = new Pallet
                 {
                     Id = Guid.NewGuid().ToString(),
-                    Width = defaultPallet.Width,
-                    Length = defaultPallet.Length,
-                    Height = defaultPallet.Height,
-                    MaxWeight = defaultPallet.MaxWeight,
+                    Width = 80,
+                    Length = 210,
+                    Height = 30,
+                    MaxWeight = Globals.MAX_WEIGHT,
                     IsSpecial = element.MustBeAlone
                 };
 
-                if (!CanPlace(element, newPallet, settings))
-                    throw new InvalidOperationException($"Cannot place element {element.Id}");
+                try
+                {
+                    if (!CanPlace(element, newPallet, settings))
+                        {
+                        throw new InvalidOperationException($"Element {element.Name} cannot be placed on a new pallet due to size or weight constraints.");
+                    }
+                } catch (Exception ex)
+                {
+                    Console.WriteLine($"Element {element.Name} cannot be placed on a new pallet.", ex);
+                }
 
                 newPallet.Elements.Add(element);
                 pallets.Add(newPallet);
@@ -57,15 +71,27 @@
         return pallets;
     }
 
-    private bool CanPlace(Element el, Pallet pallet, OptimizationSettings settings)
+    private static bool CanPlace(Element el, Pallet pallet, OptimizationSettings settings)
     {
-        if (el.MustBeAlone && pallet.Elements.Count > 0) return false;
+        if (el.MustBeAlone && pallet.Elements.Count > 0)
+        {
+            Console.WriteLine($"Element {el.Name} must be alone on the pallet.");
+            return false;
+        }
+        
+         
+        if (pallet.CurrentHeight + el.Height > Globals.MAX_HEIGHT)
+        {
+            Console.WriteLine($"Element {el.Name} exceeds max pallet height.");
+            return false;
+        }
 
-        if (pallet.CurrentHeight + el.Height > settings.MaxPalletHeight) return false;
 
-        if (el.WeightKg > settings.MaxWeightPerElement) return false;
-
-        if (pallet.CurrentWeight + el.WeightKg > pallet.MaxWeight) return false;
+        if (pallet.CurrentWeight + el.WeightKg > pallet.MaxWeight)
+        {
+            Console.WriteLine($"Element {el.Name} exceeds pallet max weight.");
+            return false;
+        }
 
         return true;
     }
