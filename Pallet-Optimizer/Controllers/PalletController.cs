@@ -106,13 +106,11 @@ namespace Pallet_Optimizer.Controllers
             pallet.Elements.Add(element);
             await _repo.UpdatePalletAsync(dto.PalletId, pallet);
 
-            List<Pallet> pallets = GreedyPalletOptimizer.Optimize(pallet.Elements, pallet, new OptimizationSettings());
-            foreach(var pall in pallets)
-            {
-                await _repo.UpdatePalletAsync(pall.Id, pall);
-            }
-            return Json(new { success = true, element, pallets });
+            List<Element> elementer = GreedyPalletOptimizer.Optimize(pallet.Elements, pallet, new OptimizationSettings());
+
+            return Json(new { success = true, element, pallet });
         }
+
 
         // POST: /Pallet/RemoveElement
         [HttpPost]
