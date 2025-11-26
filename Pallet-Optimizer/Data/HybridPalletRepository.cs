@@ -6,8 +6,7 @@ using Pallet_Optimizer.Models;
 
 namespace Pallet_Optimizer.Data
 {
-    // Hybrid repository: primary persistence via EF, runtime cache via in-memory store.
-    // Keeps the in-memory store synchronized with the database on reads/writes.
+    // Hybrid repository: EF persistence + in-memory cache.
     public class HybridPalletRepository : IPalletRepository
     {
         private readonly EfPalletRepository _ef;
@@ -25,11 +24,9 @@ namespace Pallet_Optimizer.Data
             {
                 var efHolder = await _ef.GetHolderAsync();
 
-                // Sync memory store to match EF store:
                 var memHolder = await _mem.GetHolderAsync();
 
-                // Remove mem pallets that are not present in EF
-                foreach (var mp in memHolder.Pallets)
+                foreach (var mp in memHolder.Pallets.ToList())
                 {
                     if (!efHolder.Pallets.Any(p => p.Id == mp.Id))
                     {
@@ -37,77 +34,70 @@ namespace Pallet_Optimizer.Data
                     }
                 }
 
-                // Add/replace mem pallets with EF pallets (ensure mem has up-to-date copy)
                 foreach (var p in efHolder.Pallets)
                 {
                     var existing = await _mem.GetPalletAsync(p.Id);
                     if (existing == null)
-                    {
                         await _mem.AddPalletAsync(p);
-                    }
                     else
-                    {
                         await _mem.UpdatePalletAsync(p.Id, p);
-                    }
                 }
 
                 return efHolder;
             }
             catch
             {
-                // If EF fails, fall back to memory
                 return await _mem.GetHolderAsync();
             }
         }
 
-        public async Task<Pallet?> GetPalletAsync(string index)
+        public async Task<Pallet?> GetPalletAsync(string palletId)
         {
             try
             {
-                var ef = await _ef.GetPalletAsync(index);
+                var ef = await _ef.GetPalletAsync(palletId);
                 if (ef != null)
                 {
-                    // keep memory in sync
-                    var mem = await _mem.GetPalletAsync(index);
+                    var mem = await _mem.GetPalletAsync(palletId);
                     if (mem == null) await _mem.AddPalletAsync(ef);
                     else await _mem.UpdatePalletAsync(ef.Id, ef);
                     return ef;
                 }
             }
-            catch { /* ignore and fallback to memory */ }
+            catch { }
 
-            return await _mem.GetPalletAsync(index);
+            return await _mem.GetPalletAsync(palletId);
         }
 
         public async Task AddPalletAsync(Pallet pallet)
         {
-            // Persist to EF (will set pallet.Id to DB id in modified EfPalletRepository)
             await _ef.AddPalletAsync(pallet);
-
-            // ensure memory store mirrors the persisted object (pallet.Id updated)
             await _mem.AddPalletAsync(pallet);
         }
 
-        public async Task UpdatePalletAsync(string index, Pallet updated)
+        public async Task UpdatePalletAsync(string id, Pallet updated)
         {
-            try
-            {
-                await _ef.UpdatePalletAsync(index, updated);
-            }
-            catch { /* continue to attempt memory update */ }
-
-            await _mem.UpdatePalletAsync(index, updated);
+            try { await _ef.UpdatePalletAsync(id, updated); } catch { }
+            await _mem.UpdatePalletAsync(id, updated);
         }
 
-        public async Task DeletePalletAsync(string index)
+        public async Task DeletePalletAsync(string id)
         {
-            try
-            {
-                await _ef.DeletePalletAsync(index);
-            }
-            catch { /* ignore */ }
+            try { await _ef.DeletePalletAsync(id); } catch { }
+            await _mem.DeletePalletAsync(id);
+        }
 
-            await _mem.DeletePalletAsync(index);
+        public async Task UpdateHolderAsync(PalletHolder holder)
+        {
+            if (holder == null) throw new ArgumentNullException(nameof(holder), "Holder payload was null.");
+            if (holder.Pallets == null) throw new ArgumentException("Holder.Pallets collection was null.", nameof(holder));
+
+            // Persist full holder via EF
+            await _ef.UpdateHolderAsync(holder);
+
+            // Sync memory copy
+            var refreshed = await _ef.GetHolderAsync();
+            await _mem.UpdateHolderAsync(refreshed);
         }
     }
 }

@@ -41,7 +41,7 @@ namespace Pallet_Optimizer.Data
                 Length = (double)db.Length,
                 Height = (double)db.Height,
                 MaxHeight = (double)db.MaxHeight,
-                MaxWeight = (double)db.MaxWeight,
+                MaxWeightKg = (double)db.MaxWeightKg,
                 CurrentHeight = 0,
                 CurrentWeight = 0,
                 MaterialType = material,
@@ -83,7 +83,7 @@ namespace Pallet_Optimizer.Data
                 Width = Convert.ToDecimal(domain.Width),
                 Height = Convert.ToDecimal(domain.Height),
                 MaxHeight = Convert.ToDecimal(domain.MaxHeight),
-                MaxWeight = Convert.ToDecimal(domain.MaxWeight),
+                MaxWeightKg = Convert.ToDecimal(domain.MaxWeightKg),
                 Type = domain.Name,
                 // Map enum -> DB id. Many DBs seed MaterialIDs starting at 1 while enums start at 0.
                 // Adjust here if your DB uses different ids.

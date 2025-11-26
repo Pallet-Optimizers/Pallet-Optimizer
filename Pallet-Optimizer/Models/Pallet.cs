@@ -11,7 +11,8 @@ public class Pallet
     public double CurrentWeight{ get; set; } 
     public double Length { get; set; }
     public double MaxHeight { get; set; }
-    public double MaxWeight { get; set; } = Globals.MAX_WEIGHT; // KG
+    public double MaxWeightKg { get; set; } = Globals.MAX_WEIGHTKg; // KG
+    public double WeightKg { get; set; }
     public PALLET_MATERIAL_TYPE MaterialType { get; set; } = 0; // 0=Wood, 1=Plastic, etc.
     public bool IsSpecial { get; set; } = false;
 

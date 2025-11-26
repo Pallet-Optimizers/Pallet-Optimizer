@@ -100,7 +100,7 @@ namespace Pallet_Optimizer.Algorithms
                 Width = t.Width,
                 Length = t.Length,
                 MaxHeight = t.MaxHeight,
-                MaxWeight = t.MaxWeight,
+                MaxWeightKg = t.MaxWeightKg,
                 Elements = new List<Element>()
             };
         }
@@ -116,7 +116,7 @@ namespace Pallet_Optimizer.Algorithms
         private static bool TryPlaceOnPallet(Pallet pallet, Element el, PackingSettings settings)
         {
             // quick weight / height checks
-            if (pallet.CurrentWeightKg + el.WeightKg > pallet.MaxWeight) return false;
+            if (pallet.CurrentWeightKg + el.WeightKg > pallet.MaxWeightKg) return false;
             if (el.Height + pallet.CurrentHeight > Math.Min(pallet.MaxHeight, settings.MaxPalletHeightAbsolute)) return false;
 
             // build layers (list of Z base positions)

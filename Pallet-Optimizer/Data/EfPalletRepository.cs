@@ -27,8 +27,8 @@ namespace Pallet_Optimizer.Data {
             };
         }
 
-        public async Task<Pallet?> GetPalletAsync(string index) {
-            if (!int.TryParse(index, out var pid)) return null;
+        public async Task<Pallet?> GetPalletAsync(string palletId) {
+            if (!int.TryParse(palletId, out var pid)) return null;
 
             var db = await _context.Set<PalletDb>()
                 .Include(p => p.Elements)
@@ -38,9 +38,9 @@ namespace Pallet_Optimizer.Data {
         }
 
         public async Task AddPalletAsync(Pallet pallet) {
-            var db = pallet.ToDb();
+            if (pallet == null) throw new ArgumentNullException(nameof(pallet), "Pallet payload was null.");
 
-            // Only update persisted WeightKg — pallet dimensions must remain as provided.
+            var db = pallet.ToDb();
             db.RecalculateWeightKg();
 
             await _context.Set<PalletDb>().AddAsync(db);
@@ -55,8 +55,9 @@ namespace Pallet_Optimizer.Data {
             }
         }
 
-        public async Task UpdatePalletAsync(string index, Pallet updated) {
-            if (!int.TryParse(index, out var pid)) return;
+        public async Task UpdatePalletAsync(string id, Pallet updated) {
+            if (updated == null) throw new ArgumentNullException(nameof(updated), "Updated pallet payload was null.");
+            if (!int.TryParse(id, out var pid)) return;
 
             var db = await _context.Set<PalletDb>()
                 .Include(p => p.Elements)
@@ -68,7 +69,7 @@ namespace Pallet_Optimizer.Data {
             db.Length = Convert.ToDecimal(updated.Length);
             db.Height = Convert.ToDecimal(updated.Height);
             db.MaxHeight = Convert.ToDecimal(updated.MaxHeight);
-            db.MaxWeight = Convert.ToDecimal(updated.MaxWeight);
+            db.MaxWeightKg = Convert.ToDecimal(updated.MaxWeightKg);
             db.Active = !updated.IsSpecial;
             db.MaterialId = (int)updated.MaterialType + 1;
 
@@ -78,20 +79,80 @@ namespace Pallet_Optimizer.Data {
             }
 
             db.Elements = updated.Elements?.Select(e => e.ToDb()).ToList() ?? new List<ElementDb>();
-
-            // Only recalculate WeightKg here so pallet dimensions remain unchanged.
             db.RecalculateWeightKg();
 
             await _context.SaveChangesAsync();
         }
 
-        public async Task DeletePalletAsync(string index) {
-            if (!int.TryParse(index, out var pid)) return;
+        public async Task DeletePalletAsync(string id) {
+            if (!int.TryParse(id, out var pid)) return;
 
             var db = await _context.Set<PalletDb>().FindAsync(pid);
             if (db == null) return;
 
             _context.Set<PalletDb>().Remove(db);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task UpdateHolderAsync(PalletHolder holder) {
+            if (holder == null)
+                throw new ArgumentNullException(nameof(holder), "Holder payload was null.");
+            if (holder.Pallets == null)
+                throw new ArgumentException("Holder.Pallets collection was null.", nameof(holder));
+
+            var dbSet = _context.Set<PalletDb>();
+            var existing = await dbSet
+                .Include(p => p.Elements)
+                .ToListAsync();
+
+            var incoming = holder.Pallets
+                .Select(p => (Parsed: int.TryParse(p.Id, out var v), Value: v, Pallet: p))
+                .ToList();
+
+            var incomingIds = new HashSet<int>(incoming.Where(i => i.Parsed).Select(i => i.Value));
+            var toRemove = existing.Where(e => !incomingIds.Contains(e.PalletId)).ToList();
+            if (toRemove.Any()) {
+                _context.RemoveRange(toRemove);
+            }
+
+            foreach (var inc in incoming) {
+                var domainPallet = inc.Pallet;
+
+                if (!inc.Parsed) {
+                    var newDb = domainPallet.ToDb();
+                    newDb.RecalculateWeightKg();
+                    await dbSet.AddAsync(newDb);
+                    await _context.SaveChangesAsync();
+                    domainPallet.Id = newDb.PalletId.ToString();
+                    continue;
+                }
+
+                var dbPallet = existing.FirstOrDefault(p => p.PalletId == inc.Value);
+                if (dbPallet == null) {
+                    var addDb = domainPallet.ToDb();
+                    addDb.RecalculateWeightKg();
+                    await dbSet.AddAsync(addDb);
+                    await _context.SaveChangesAsync();
+                    domainPallet.Id = addDb.PalletId.ToString();
+                    continue;
+                }
+
+                dbPallet.Type = domainPallet.Name;
+                dbPallet.Width = Convert.ToDecimal(domainPallet.Width);
+                dbPallet.Length = Convert.ToDecimal(domainPallet.Length);
+                dbPallet.Height = Convert.ToDecimal(domainPallet.Height);
+                dbPallet.MaxHeight = Convert.ToDecimal(domainPallet.MaxHeight);
+                dbPallet.MaxWeightKg = Convert.ToDecimal(domainPallet.MaxWeightKg);
+                dbPallet.Active = !domainPallet.IsSpecial;
+                dbPallet.MaterialId = (int)domainPallet.MaterialType + 1;
+
+                var existingEls = dbPallet.Elements?.ToList() ?? new List<ElementDb>();
+                if (existingEls.Any()) _context.RemoveRange(existingEls);
+                dbPallet.Elements = domainPallet.Elements?.Select(e => e.ToDb()).ToList() ?? new List<ElementDb>();
+
+                dbPallet.RecalculateWeightKg();
+            }
+
             await _context.SaveChangesAsync();
         }
     }

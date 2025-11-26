@@ -34,8 +34,7 @@ public partial class PalletOptimizationDbContext : DbContext
     public virtual DbSet<SettingDb> Settings { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
-        => optionsBuilder.UseSqlServer("Server=MAGNUS\\SQLEXPRESS;Database=PalletOptimizationDB;Trusted_Connection=True;TrustServerCertificate=True;");
+    => optionsBuilder.UseSqlServer("Server=MAGNUS\\SQLEXPRESS;Database=PalletOptimizationDB;Trusted_Connection=True;TrustServerCertificate=True;");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -154,7 +153,7 @@ public partial class PalletOptimizationDbContext : DbContext
             entity.Property(e => e.Height).HasColumnType("decimal(10, 2)");
             entity.Property(e => e.Length).HasColumnType("decimal(10, 2)");
             entity.Property(e => e.MaxHeight).HasColumnType("decimal(10, 2)");
-            entity.Property(e => e.MaxWeight).HasColumnType("decimal(10, 2)");
+            entity.Property(e => e.MaxWeightKg).HasColumnType("decimal(10, 2)");
             entity.Property(e => e.PalletSize).HasMaxLength(50);
             entity.Property(e => e.Type).HasMaxLength(50);
             entity.Property(e => e.Width).HasColumnType("decimal(10, 2)");

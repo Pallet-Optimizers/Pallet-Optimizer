@@ -135,7 +135,7 @@ namespace Pallet_Optimizer.Controllers
             template.Elements = all.Select(CloneElementForAlgorithm).ToList();
 
             // run the algorithm
-            var packedHolder = GreedyPalletPacking.PackAll(dummy, settings);
+            var packedHolder = GreedyPalletOptimizer.PackAll(dummy, settings);
 
             // save result
             await _repo.UpdateHolderAsync(packedHolder);
@@ -169,7 +169,7 @@ namespace Pallet_Optimizer.Controllers
 
             var settings = new PackingSettings();
 
-            var packedHolder = GreedyPalletPacking.PackAll(dummy, settings);
+            var packedHolder = GreedyPalletOptimizer.PackAll(dummy, settings);
 
             await _repo.UpdateHolderAsync(packedHolder);
 
@@ -249,5 +249,6 @@ namespace Pallet_Optimizer.Controllers
         public double? Length { get; set; }
         public double? MaxHeight { get; set; }
         public double? MaxWeightKg { get; set; }
+        public double? WeightKg { get; set; }
     }
 }

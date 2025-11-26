@@ -77,7 +77,7 @@ namespace Pallet_Optimizer.Data {
                 entity.Property(e => e.Height).HasColumnType("decimal(10, 2)");
                 entity.Property(e => e.Length).HasColumnType("decimal(10, 2)");
                 entity.Property(e => e.MaxHeight).HasColumnType("decimal(10, 2)");
-                entity.Property(e => e.MaxWeight).HasColumnType("decimal(10, 2)");
+                entity.Property(e => e.MaxWeightKg).HasColumnType("decimal(10, 2)");
                 entity.Property(e => e.WeightKg).HasColumnType("decimal(10, 2)");
                 entity.Property(e => e.Width).HasColumnType("decimal(10, 2)");
             });
