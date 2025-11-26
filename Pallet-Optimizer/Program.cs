@@ -24,4 +24,3 @@ app.MapControllerRoute(
     pattern: "{controller=Pallet}/{action=Index}");
 
 app.Run();
-

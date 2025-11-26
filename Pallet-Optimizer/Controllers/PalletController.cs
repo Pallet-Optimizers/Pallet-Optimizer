@@ -8,8 +8,7 @@ using System.Collections.Generic;
 
 namespace Pallet_Optimizer.Controllers
 {
-    [Route("api/[controller]/[action]")]
-    [ApiController]
+
     public class PalletController : Controller
     {
         private readonly IPalletRepository _repo;
@@ -18,6 +17,12 @@ namespace Pallet_Optimizer.Controllers
         {
             _repo = repo;
         }
+
+        public IActionResult Index()
+        {
+            return View();
+        }
+
 
         // ---------------------------------------------------------------
         // GET HOLDER
