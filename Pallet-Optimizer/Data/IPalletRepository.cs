@@ -1,14 +1,14 @@
-﻿using Pallet_Optimizer.Models;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
+using Pallet_Optimizer.Models;
 
 namespace Pallet_Optimizer.Data
 {
     public interface IPalletRepository
     {
         Task<PalletHolder> GetHolderAsync();
-        Task<Pallet?> GetPalletAsync(string index);
-        Task UpdatePalletAsync(string index, Pallet updated);
-        Task AddPalletAsync(Pallet pallet);
-        Task DeletePalletAsync(string index);
+        Task UpdateHolderAsync(PalletHolder holder);
+
+        Task<Pallet> GetPalletAsync(string palletId);
+        Task UpdatePalletAsync(Pallet pallet);
     }
 }

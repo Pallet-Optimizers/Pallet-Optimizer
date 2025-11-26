@@ -7,5 +7,8 @@ namespace Pallet_Optimizer.Models
     {
         public List<Pallet> Pallets { get; set; } = new List<Pallet>();
         public int CurrentPalletIndex { get; set; } = 0;
+
+        public IEnumerable<Element> GetAllElements()
+            => Pallets.SelectMany(p => p.Elements ?? new List<Element>());
     }
 }

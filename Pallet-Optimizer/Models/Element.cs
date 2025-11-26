@@ -2,6 +2,9 @@
 {
     public string Id { get; set; }
     public string Name { get; set; }
+    public float Z { get; set; }
+    public float X { get; set; }
+    public float Y { get; set; }
     public double Width { get; set; }
     public double Height { get; set; }
     public double Depth { get; set; }
@@ -15,4 +18,5 @@
     // for compatibility with your old optimizer code
     public (double Width, double Height, double Depth) Size => (Width, Height, Depth);
     public double FootprintArea => Width * Depth;
+    public bool Rotated { get; set; } = false; // rotated 90° in plane
 }
