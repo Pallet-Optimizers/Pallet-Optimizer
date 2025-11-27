@@ -98,6 +98,24 @@ namespace Pallet_Optimizer.Controllers
 
             var holder = await _repo.GetHolderAsync();
 
+            if (holder.Pallets == null || holder.Pallets.Count == 0)
+            {
+                var defaultPallet = new Pallet
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Name = "Auto pallet",
+                    Width = 1.2,
+                    Length = 0.8,
+                    MaxHeight = 1.8,
+                    MaxWeightKg = 1000,
+                    Elements = new List<Element>()
+                };
+
+                holder.Pallets = new List<Pallet> { defaultPallet };
+                await _repo.UpdateHolderAsync(holder);
+            }
+
+
             // collect all existing elements
             var all = holder.Pallets
                 .SelectMany(p => p.Elements)

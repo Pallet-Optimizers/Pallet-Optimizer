@@ -10,14 +10,59 @@
     <title>Pallet Visualizer</title>
     <script src="https://cdn.babylonjs.com/babylon.js"></script>
     <style>
-        body { margin: 0; display:flex; height:100vh; font-family: Arial, sans-serif; }
-        .sidebar { width:360px; background:#0b1220; color:#e6eef6; padding:12px; box-sizing:border-box; overflow:auto;}
-        .content { flex:1; position:relative; }
-        canvas { width:100%; height:100%; display:block; }
-        input, select { width:100%; padding:6px; margin-bottom:8px; box-sizing:border-box; }
-        button { padding:8px 12px; background:#2b9cff; color:white; border:none; cursor:pointer; }
-        table { width:100%; color:#e6eef6; font-size:13px; border-collapse:collapse;}
-        td, th { padding:6px; border-bottom:1px solid rgba(255,255,255,0.03);}
+        body {
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            font-family: Arial, sans-serif;
+        }
+
+        .sidebar {
+            width: 360px;
+            background: #0b1220;
+            color: #e6eef6;
+            padding: 12px;
+            box-sizing: border-box;
+            overflow: auto;
+        }
+
+        .content {
+            flex: 1;
+            position: relative;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 6px;
+            margin-bottom: 8px;
+            box-sizing: border-box;
+        }
+
+        button {
+            padding: 8px 12px;
+            background: #2b9cff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        table {
+            width: 100%;
+            color: #e6eef6;
+            font-size: 13px;
+            border-collapse: collapse;
+        }
+
+        td, th {
+            padding: 6px;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+        }
     </style>
 </head>
 <body>
@@ -50,8 +95,9 @@
     </div>
 
     <script>
-        const holder = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model ?? new Pallet_Optimizer.Models.PalletHolder()));
-        let sceneState = { holder: holder };
+        // initial holder from server (case-insensitive parsing is handled below)
+        const rawHolder = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model ?? new Pallet_Optimizer.Models.PalletHolder()));
+        let sceneState = { holder: normalizeHolder(rawHolder) };
 
         // Babylon init
         const canvas = document.getElementById('renderCanvas');
@@ -65,50 +111,166 @@
         light.intensity = 0.8;
 
         let groupNodes = [];
+        let disposableMaterials = [];
 
-        function clearScene() {
-            groupNodes.forEach(n => n.dispose());
+        function disposeAll() {
+            groupNodes.forEach(n => {
+                try { n.dispose(); } catch(_) {}
+            });
             groupNodes = [];
+
+            disposableMaterials.forEach(m => {
+                try { m.dispose(); } catch(_) {}
+            });
+            disposableMaterials = [];
         }
 
-        function renderHolder(h) {
-            clearScene();
+        function safeGet(obj, ...keys) {
+            if (!obj) return undefined;
+            for (const k of keys) {
+                if (k in obj) return obj[k];
+                const lower = k.charAt(0).toLowerCase() + k.slice(1);
+                const upper = k.charAt(0).toUpperCase() + k.slice(1);
+                if (lower in obj) return obj[lower];
+                if (upper in obj) return obj[upper];
+            }
+            return undefined;
+        }
+
+        function normalizeHolder(h) {
+            if (!h) return { Pallets: [], currentPalletIndex: 0 };
+
+            const pallets = (safeGet(h, 'Pallets', 'pallets') || []).map((p, i) => {
+                const width = safeGet(p, 'Width', 'width') || safeGet(p, 'W', 'w') || 1.2;
+                const length = safeGet(p, 'Length', 'length') || safeGet(p, 'LengthM', 'lengthM') || 0.8;
+                const maxHeight = safeGet(p, 'MaxHeight', 'maxHeight') || safeGet(p, 'maxHeight', 'Maxheight') || safeGet(p, 'MaxH', 'maxH') || 1.8;
+                const name = safeGet(p, 'Name', 'name') || `Pallet ${i+1}`;
+                const id = safeGet(p, 'Id', 'id') || safeGet(p, 'ID', 'Id') || String(i+1);
+
+                const elementsRaw = safeGet(p, 'Elements', 'elements') || [];
+                const elements = elementsRaw.map((el, idx) => {
+                    const X = safeGet(el, 'X', 'x') ?? safeGet(el, 'PosX', 'posX') ?? 0;
+                    const Y = safeGet(el, 'Y', 'y') ?? safeGet(el, 'PosY', 'posY') ?? 0;
+                    const Z = safeGet(el, 'Z', 'z') ?? safeGet(el, 'PosZ', 'posZ') ?? 0;
+
+                    // width/depth mapping — handle rotated field names as well
+                    const width = safeGet(el, 'Width', 'width') ?? safeGet(el, 'W', 'w') ?? 0.4;
+                    const depth = safeGet(el, 'Depth', 'depth') ?? safeGet(el, 'D', 'd') ?? 0.4;
+                    const height = safeGet(el, 'Height', 'height') ?? safeGet(el, 'H', 'h') ?? 0.3;
+                    const rotated = !!(safeGet(el, 'Rotated', 'rotated') || safeGet(el, 'IsRotated', 'isRotated'));
+                    const nameEl = safeGet(el, 'Name', 'name') || `E${idx+1}`;
+
+                    return {
+                        Id: safeGet(el, 'Id', 'id') || String(idx+1),
+                        Name: nameEl,
+                        X: Number(X) || 0,
+                        Y: Number(Y) || 0,
+                        Z: Number(Z) || 0,
+                        Width: Number(width) || 0.4,
+                        Depth: Number(depth) || 0.4,
+                        Height: Number(height) || 0.3,
+                        WeightKg: Number(safeGet(el, 'WeightKg', 'weightKg', 'weight')) || 0,
+                        CanRotate: !!safeGet(el, 'CanRotate', 'canRotate'),
+                        MustBeAlone: !!safeGet(el, 'MustBeAlone', 'mustBeAlone'),
+                        Rotated: rotated,
+                        PalletId: safeGet(el, 'PalletId', 'palletId') || id
+                    };
+                });
+
+                return {
+                    Id: id,
+                    Name: name,
+                    Width: Number(width),
+                    Length: Number(length),
+                    MaxHeight: Number(maxHeight),
+                    Elements: elements
+                };
+            });
+
+            return {
+                Pallets: pallets,
+                currentPalletIndex: safeGet(h, 'currentPalletIndex', 'CurrentPalletIndex') || 0
+            };
+        }
+
+        function renderHolder(hRaw) {
+            const h = normalizeHolder(hRaw);
+            disposeAll();
+
             let offsetX = 0;
             const gap = 0.6; // gap between pallets in meters
 
             (h.Pallets || []).forEach((p, i) => {
                 const group = new BABYLON.TransformNode("palletGroup_" + i, scene);
 
-                // pallet base
+                // pallet base (thin box)
                 const base = BABYLON.MeshBuilder.CreateBox("base_" + i, {
                     width: p.Width, height: 0.05, depth: p.Length
                 }, scene);
-                base.position = new BABYLON.Vector3(offsetX + p.Width/2, 0.025, p.Length/2);
+                base.position = new BABYLON.Vector3(offsetX + p.Width / 2, 0.025, p.Length / 2);
                 const mat = new BABYLON.StandardMaterial("mat_"+i, scene);
                 mat.diffuseColor = new BABYLON.Color3(0.6, 0.4, 0.2);
                 base.material = mat;
                 base.parent = group;
+                disposableMaterials.push(mat);
 
                 // draw elements
                 (p.Elements || []).forEach((el, idx) => {
+                    // compute oriented footprint
                     const w = el.Rotated ? el.Depth : el.Width;
                     const d = el.Rotated ? el.Width : el.Depth;
                     const hgt = el.Height;
-                    const box = BABYLON.MeshBuilder.CreateBox("el_"+i+"_"+idx, { width: w, height: hgt, depth: d }, scene);
-                    box.position = new BABYLON.Vector3(offsetX + el.X + w/2, 0.05 + el.Z + hgt/2, el.Y + d/2);
-                    const emat = new BABYLON.StandardMaterial("emat_"+i+"_"+idx, scene);
-                    emat.diffuseColor = BABYLON.Color3.FromHSV((idx*47)%360, 0.6, 0.9);
+
+                    // position mapping:
+                    // X = along pallet width (left -> right)
+                    // Y = along pallet depth (front -> back)
+                    // Z = vertical (bottom -> up)
+                    const posX = offsetX + el.X + w / 2;
+                    const posY = el.Y + d / 2;
+                    const posZ = 0.05 + el.Z + hgt / 2; // raise above pallet base
+
+                    const box = BABYLON.MeshBuilder.CreateBox("el_" + i + "_" + idx, { width: w, height: hgt, depth: d }, scene);
+                    box.position = new BABYLON.Vector3(posX, posZ, posY);
+
+                    const emat = new BABYLON.StandardMaterial("emat_" + i + "_" + idx, scene);
+                    const hue = (idx * 47) % 360;
+                    // Babylon doesn't allow specifying HSV directly easily across versions, so compute simple color
+                    const hNorm = (hue / 360);
+                    const c = hsvToRgb(hNorm, 0.6, 0.9);
+                    emat.diffuseColor = new BABYLON.Color3(c.r, c.g, c.b);
                     box.material = emat;
+                    disposableMaterials.push(emat);
+
                     box.parent = group;
                 });
 
                 groupNodes.push(group);
-                offsetX += p.Width + gap;
+                offsetX += (p.Width || 1.2) + gap;
             });
 
-            // adjust camera radius
-            const totalWidth = (h.Pallets || []).reduce((s,p)=>s+(p.Width||1.2)+gap, 0);
+            // adjust camera radius and target
+            const totalWidth = (h.Pallets || []).reduce((s, p) => s + ((p.Width || 1.2) + 0.6), 0);
+            camera.target = new BABYLON.Vector3(totalWidth / 2, 0, 0.5);
             camera.radius = Math.max(3, totalWidth);
+        }
+
+        // small HSV -> RGB helper (inputs: h in [0,1], s,v in [0,1])
+        function hsvToRgb(h, s, v) {
+            let r = 0, g = 0, b = 0;
+            const i = Math.floor(h * 6);
+            const f = h * 6 - i;
+            const p = v * (1 - s);
+            const q = v * (1 - f * s);
+            const t = v * (1 - (1 - f) * s);
+            switch (i % 6) {
+                case 0: r = v; g = t; b = p; break;
+                case 1: r = q; g = v; b = p; break;
+                case 2: r = p; g = v; b = t; break;
+                case 3: r = p; g = q; b = v; break;
+                case 4: r = t; g = p; b = v; break;
+                case 5: r = v; g = p; b = q; break;
+            }
+            return { r, g, b };
         }
 
         engine.runRenderLoop(()=>scene.render());
@@ -149,7 +311,7 @@
             try {
                 const json = await postJson('/Pallet/AddElement', dto);
                 if (json && json.holder) {
-                    sceneState.holder = json.holder;
+                    sceneState.holder = normalizeHolder(json.holder);
                     renderHolder(sceneState.holder);
                     rebuildPalletList();
                 } else {
