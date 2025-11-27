@@ -1,10 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 
 namespace Pallet_Optimizer.Data.Database;
 
 public partial class PackageElementDb
 {
+    [Key]
     public int PackageElementId { get; set; }
 
     public int PackagePlanId { get; set; }

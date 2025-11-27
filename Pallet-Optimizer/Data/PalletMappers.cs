@@ -15,7 +15,6 @@ namespace Pallet_Optimizer.Data
 
             PALLET_MATERIAL_TYPE material = PALLET_MATERIAL_TYPE.Wood;
 
-            // Map DB MaterialId (likely 1-based) back to enum (0-based) if in range.
             if (db.MaterialId > 0)
             {
                 var enumIndex = db.MaterialId - 1;
@@ -71,38 +70,36 @@ namespace Pallet_Optimizer.Data
             };
         }
 
-        // Map domain Pallet -> DB PalletDb (for add/update)
+        // Map domain Pallet -> DB PalletDb (do not set identity)
         public static PalletDb ToDb(this Pallet domain)
         {
             if (domain == null) return null!;
 
             var db = new PalletDb
             {
-                PalletId = TryParseInt(domain.Id),
                 Length = Convert.ToDecimal(domain.Length),
                 Width = Convert.ToDecimal(domain.Width),
                 Height = Convert.ToDecimal(domain.Height),
                 MaxHeight = Convert.ToDecimal(domain.MaxHeight),
                 MaxWeightKg = Convert.ToDecimal(domain.MaxWeightKg),
                 Type = domain.Name,
-                // Map enum -> DB id. Many DBs seed MaterialIDs starting at 1 while enums start at 0.
-                // Adjust here if your DB uses different ids.
                 MaterialId = (int)domain.MaterialType + 1,
                 Active = !domain.IsSpecial,
+                // Elements will also avoid setting identity
                 Elements = domain.Elements?.Select(e => e.ToDb()).ToList() ?? new List<ElementDb>()
             };
 
             return db;
         }
 
-        // Map domain Element -> DB ElementDb
+        // Map domain Element -> DB ElementDb (do not set identity)
         public static ElementDb ToDb(this Element domain)
         {
             if (domain == null) return null!;
 
             return new ElementDb
             {
-                ElementId = TryParseInt(domain.Id),
+                // ElementId intentionally not set; let DB generate it
                 Width = Convert.ToDecimal(domain.Width),
                 Height = Convert.ToDecimal(domain.Height),
                 Depth = Convert.ToDecimal(domain.Depth),
