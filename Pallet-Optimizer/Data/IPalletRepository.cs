@@ -1,21 +1,18 @@
-﻿using Pallet_Optimizer.Models;
-using System.Collections.Generic;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
+using Pallet_Optimizer.Models;
 
 namespace Pallet_Optimizer.Data
 {
+    // Updated to match actual usage in controllers and repositories.
     public interface IPalletRepository
     {
         Task<PalletHolder> GetHolderAsync();
-        Task<Pallet> GetPalletAsync(int index);
-        Task UpdatePalletAsync(int index, Pallet updated);
-        Task AddPalletAsync(Pallet pallet);
+        Task UpdateHolderAsync(PalletHolder holder);
 
-        // New methods for package plan management
-        Task<List<PackagePlanViewModel>> GetAllPackagePlansAsync();
-        Task<PalletHolder> GetPackagePlanByIdAsync(string id);
-        Task<string> CreatePackagePlanAsync(string name);
-        Task<bool> DeletePackagePlanAsync(string id);
-        Task<bool> UpdatePackagePlanAsync(string id, PalletHolder holder);
+        Task<Pallet?> GetPalletAsync(string palletId);
+
+        Task AddPalletAsync(Pallet pallet);
+        Task UpdatePalletAsync(string id, Pallet pallet);
+        Task DeletePalletAsync(string id);
     }
 }

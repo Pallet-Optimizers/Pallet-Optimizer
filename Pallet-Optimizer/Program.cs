@@ -1,32 +1,29 @@
 using Pallet_Optimizer.Data;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllersWithViews();
 
-// Tilføj HttpContextAccessor (nødvendig for session i views)
-builder.Services.AddHttpContextAccessor();
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlServer(
+        builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Tilføj session support
-builder.Services.AddSession(options =>
-{
-    options.IdleTimeout = TimeSpan.FromMinutes(30);
-    options.Cookie.HttpOnly = true;
-    options.Cookie.IsEssential = true;
-});
-
-builder.Services.AddSingleton<IPalletRepository, InMemoryPalletRepository>();
+// register both concrete repositories and expose the hybrid as IPalletRepository
+builder.Services.AddScoped<InMemoryPalletRepository>();
+builder.Services.AddScoped<EfPalletRepository>();
+builder.Services.AddScoped<IPalletRepository, HybridPalletRepository>();
 
 var app = builder.Build();
 
 app.UseStaticFiles();
 app.UseRouting();
 
-// Tilføj session middleware
+// TilfÃ¸j session middleware
 app.UseSession();
 
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Account}/{action=Login}/{id?}");
+    pattern: "{controller=Pallet}/{action=Index}");
 
 app.Run();

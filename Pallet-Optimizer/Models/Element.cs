@@ -2,6 +2,9 @@
 {
     public string Id { get; set; }
     public string Name { get; set; }
+    public float Z { get; set; }
+    public float X { get; set; }
+    public float Y { get; set; }
     public double Width { get; set; }
     public double Height { get; set; }
     public double Depth { get; set; }
@@ -9,7 +12,11 @@
     public bool CanRotate { get; set; } = true;
     public bool MustBeAlone { get; set; } = false;
 
+    // explicit FK property to hold the parent Pallet's Id
+    public string PalletId { get; set; }
+
     // for compatibility with your old optimizer code
     public (double Width, double Height, double Depth) Size => (Width, Height, Depth);
     public double FootprintArea => Width * Depth;
+    public bool Rotated { get; set; } = false; // rotated 90° in plane
 }

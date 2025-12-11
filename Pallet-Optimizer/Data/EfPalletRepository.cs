@@ -1,0 +1,209 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using Pallet_Optimizer.Data.Database;
+using Pallet_Optimizer.Models;
+
+namespace Pallet_Optimizer.Data {
+    public class EfPalletRepository : IPalletRepository {
+        private readonly AppDbContext _context;
+
+        public EfPalletRepository(AppDbContext context) {
+            _context = context;
+        }
+
+        public async Task<PalletHolder> GetHolderAsync() {
+            var dbPallets = await _context.Set<PalletDb>()
+                .Include(p => p.Elements)
+                .ToListAsync();
+
+            var pallets = dbPallets.Select(p => p.ToDomain()).ToList();
+
+            return new PalletHolder {
+                Pallets = pallets ?? new List<Pallet>(),
+                CurrentPalletIndex = 0
+            };
+        }
+
+        public async Task<Pallet?> GetPalletAsync(string palletId) {
+            if (!int.TryParse(palletId, out var pid)) return null;
+
+            var db = await _context.Set<PalletDb>()
+                .Include(p => p.Elements)
+                .FirstOrDefaultAsync(p => p.PalletId == pid);
+
+            return db?.ToDomain();
+        }
+
+        public async Task AddPalletAsync(Pallet pallet) {
+            if (pallet == null) throw new ArgumentNullException(nameof(pallet), "Pallet payload was null.");
+
+            var db = pallet.ToDb();
+            db.RecalculateWeightKg();
+
+            await _context.Set<PalletDb>().AddAsync(db);
+            await _context.SaveChangesAsync();
+
+            pallet.Id = db.PalletId.ToString();
+
+            if (pallet.Elements != null) {
+                foreach (var el in pallet.Elements) {
+                    el.PalletId = pallet.Id;
+                }
+            }
+        }
+
+        public async Task UpdatePalletAsync(string id, Pallet updated) {
+            if (updated == null) throw new ArgumentNullException(nameof(updated), "Updated pallet payload was null.");
+            if (!int.TryParse(id, out var pid)) return;
+
+            var db = await _context.Set<PalletDb>()
+                .Include(p => p.Elements)
+                .FirstOrDefaultAsync(p => p.PalletId == pid);
+            if (db == null) return;
+
+            db.Type = updated.Name;
+            db.Width = Convert.ToDecimal(updated.Width);
+            db.Length = Convert.ToDecimal(updated.Length);
+            db.Height = Convert.ToDecimal(updated.Height);
+            db.MaxHeight = Convert.ToDecimal(updated.MaxHeight);
+            db.MaxWeightKg = Convert.ToDecimal(updated.MaxWeightKg);
+            db.Active = !updated.IsSpecial;
+            db.MaterialId = (int)updated.MaterialType + 1;
+
+            var existingElements = db.Elements?.ToList() ?? new List<ElementDb>();
+            if (existingElements.Any()) {
+                _context.Set<ElementDb>().RemoveRange(existingElements);
+            }
+
+            db.Elements = updated.Elements?.Select(e => e.ToDb()).ToList() ?? new List<ElementDb>();
+            db.RecalculateWeightKg();
+
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task DeletePalletAsync(string id) {
+            if (!int.TryParse(id, out var pid)) return;
+
+            var db = await _context.Set<PalletDb>().FindAsync(pid);
+            if (db == null) return;
+
+            _context.Set<PalletDb>().Remove(db);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task UpdateHolderAsync(PalletHolder holder) {
+            if (holder == null)
+                throw new ArgumentNullException(nameof(holder), "Holder payload was null.");
+            if (holder.Pallets == null)
+                throw new ArgumentException("Holder.Pallets collection was null.", nameof(holder));
+
+            var dbSet = _context.Set<PalletDb>();
+            var existing = await dbSet
+                .Include(p => p.Elements)
+                .ToListAsync();
+
+            var incoming = holder.Pallets
+                .Select(p => (Parsed: int.TryParse(p.Id, out var v), Value: v, Pallet: p))
+                .ToList();
+
+            // Only attempt removals when incoming contains valid numeric IDs
+            var parsedIds = incoming.Where(i => i.Parsed).Select(i => i.Value).ToHashSet();
+            if (parsedIds.Count > 0) {
+                var toRemove = existing.Where(e => !parsedIds.Contains(e.PalletId)).ToList();
+                if (toRemove.Count > 0) {
+                    _context.RemoveRange(toRemove);
+                }
+            }
+
+            // Track domain<->db pairs for ID propagation after a single SaveChanges
+            var elementPairs = new List<(Element Domain, ElementDb Db)>();
+            var palletPairs = new List<(Pallet Domain, PalletDb Db)>(); // only for newly added pallets
+
+            foreach (var inc in incoming) {
+                var domainPallet = inc.Pallet;
+
+                if (!inc.Parsed) {
+                    // Add new pallet (identity PK generated by DB)
+                    var newDb = domainPallet.ToDb();
+
+                    if (domainPallet.Elements != null && newDb.Elements != null) {
+                        var count = Math.Min(domainPallet.Elements.Count, newDb.Elements.Count);
+                        for (int i = 0; i < count; i++) {
+                            elementPairs.Add((domainPallet.Elements[i], newDb.Elements.ElementAt(i)));
+                        }
+                    }
+
+                    newDb.RecalculateWeightKg();
+                    await dbSet.AddAsync(newDb);
+
+                    // Defer ID propagation until after SaveChanges
+                    palletPairs.Add((domainPallet, newDb));
+                    continue;
+                }
+
+                var dbPallet = existing.FirstOrDefault(p => p.PalletId == inc.Value);
+                if (dbPallet == null) {
+                    // Pallet id provided but not found -> treat as add (do NOT set identity)
+                    var addDb = domainPallet.ToDb();
+
+                    if (domainPallet.Elements != null && addDb.Elements != null) {
+                        var count = Math.Min(domainPallet.Elements.Count, addDb.Elements.Count);
+                        for (int i = 0; i < count; i++) {
+                            elementPairs.Add((domainPallet.Elements[i], addDb.Elements.ElementAt(i)));
+                        }
+                    }
+
+                    addDb.RecalculateWeightKg();
+                    await dbSet.AddAsync(addDb);
+
+                    // Defer ID propagation
+                    palletPairs.Add((domainPallet, addDb));
+                    continue;
+                }
+
+                // Update existing pallet
+                dbPallet.Type = domainPallet.Name;
+                dbPallet.Width = Convert.ToDecimal(domainPallet.Width);
+                dbPallet.Length = Convert.ToDecimal(domainPallet.Length);
+                dbPallet.Height = Convert.ToDecimal(domainPallet.Height);
+                dbPallet.MaxHeight = Convert.ToDecimal(domainPallet.MaxHeight);
+                dbPallet.MaxWeightKg = Convert.ToDecimal(domainPallet.MaxWeightKg);
+                dbPallet.Active = !domainPallet.IsSpecial;
+                dbPallet.MaterialId = (int)domainPallet.MaterialType + 1;
+
+                var existingEls = dbPallet.Elements?.ToList() ?? new List<ElementDb>();
+                if (existingEls.Any()) _context.RemoveRange(existingEls);
+
+                // Recreate elements and track pairs for ID propagation
+                dbPallet.Elements = domainPallet.Elements?.Select(e => {
+                    var dbEl = e.ToDb();
+                    elementPairs.Add((e, dbEl));
+                    return dbEl;
+                }).ToList() ?? new List<ElementDb>();
+
+                dbPallet.RecalculateWeightKg();
+            }
+
+            // Single save to avoid partial DELETE/INSERT batches causing concurrency checks to trip
+            await _context.SaveChangesAsync();
+
+            // Push generated Pallet IDs back into domain model (for newly added pallets)
+            foreach (var pair in palletPairs) {
+                pair.Domain.Id = pair.Db.PalletId.ToString();
+                if (pair.Domain.Elements != null) {
+                    foreach (var el in pair.Domain.Elements) {
+                        el.PalletId = pair.Domain.Id;
+                    }
+                }
+            }
+
+            // Push generated Element IDs back into domain model
+            foreach (var pair in elementPairs) {
+                pair.Domain.Id = pair.Db.ElementId.ToString();
+            }
+        }
+    }
+}

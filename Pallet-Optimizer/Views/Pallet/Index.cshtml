@@ -1,33 +1,29 @@
 ﻿@model Pallet_Optimizer.Models.PalletHolder
 @{
     Layout = null;
-    var currentIndex = Model?.CurrentPalletIndex ?? 0;
 }
 
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8" />
-    <title>Pallet Visualizer & Manager</title>
-
+    <title>Pallet Visualizer</title>
     <script src="https://cdn.babylonjs.com/babylon.js"></script>
-    <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
-
     <style>
-        body, html {
-            height: 100%;
+        body {
             margin: 0;
             display: flex;
-            font-family: sans-serif;
+            height: 100vh;
+            font-family: Arial, sans-serif;
         }
 
         .sidebar {
             width: 360px;
-            background: #0f1720;
+            background: #0b1220;
             color: #e6eef6;
-            padding: 16px;
+            padding: 12px;
             box-sizing: border-box;
-            overflow-y: auto;
+            overflow: auto;
         }
 
         .content {
@@ -35,54 +31,37 @@
             position: relative;
         }
 
-        #renderCanvas {
+        canvas {
             width: 100%;
             height: 100%;
             display: block;
-            background: #1e293b;
         }
 
-        .control-row {
-            margin-bottom: 12px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 4px;
-            color: #cbd5e1;
-        }
-
-        select, input[type=number], input[type=range], button {
+        input, select {
             width: 100%;
-            margin-bottom: 6px;
-        }
-
-        .element-row {
             padding: 6px;
-            border: 1px solid #334155;
-            margin-bottom: 6px;
+            margin-bottom: 8px;
+            box-sizing: border-box;
         }
 
-            .element-row input {
-                width: 60px;
-                display: inline-block;
-                margin-right: 4px;
-            }
-
-            .element-row button {
-                width: auto;
-                display: inline-block;
-                margin-left: 4px;
-            }
-
-        h3, h4 {
-            margin: 12px 0 6px 0;
-        }
-
-        hr {
+        button {
+            padding: 8px 12px;
+            background: #2b9cff;
+            color: white;
             border: none;
-            border-top: 1px solid #334155;
-            margin: 12px 0;
+            cursor: pointer;
+        }
+
+        table {
+            width: 100%;
+            color: #e6eef6;
+            font-size: 13px;
+            border-collapse: collapse;
+        }
+
+        td, th {
+            padding: 6px;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
         }
 
         .btn-back {
@@ -105,53 +84,27 @@
 </head>
 <body>
     <div class="sidebar">
-        <a href="/Dashboard/Index" class="btn-back">
-            ← Tilbage til Dashboard
-        </a>
+        <h3>Pallet Visualizer</h3>
 
-        <h2>Pallet Manager</h2>
-
-        <div class="control-row">
-            <label>Pallet</label>
-            <select id="palletSelect"></select>
-        </div>
-
-        <div class="control-row">
-            <label>Material Type</label>
-            <select id="materialSelect">
-                @foreach (var val in Enum.GetValues(typeof(Pallet_Optimizer.Models.PALLET_MATERIAL_TYPE)))
-                {
-                    <option value="@val">@val</option>
-                }
-            </select>
-        </div>
-
-        <div class="control-row">
-            <label>Max Height (mm)</label>
-            <input type="number" id="maxHeight" step="0.1" />
-        </div>
-
-        <div class="control-row">
-            <label>Max Weight (kg)</label>
-            <input type="number" id="maxWeight" step="0.1" />
+        <div>
+            <label>Element name</label>
+            <input id="elName" />
+            <label>Width (m)</label>
+            <input id="elW" type="number" step="0.01" value="0.4" />
+            <label>Depth (m)</label>
+            <input id="elD" type="number" step="0.01" value="0.4" />
+            <label>Height (m)</label>
+            <input id="elH" type="number" step="0.01" value="0.3" />
+            <label>Weight (kg)</label>
+            <input id="elWeight" type="number" step="0.1" value="5" />
+            <label><input id="elRotate" type="checkbox" checked /> Can rotate</label><br />
+            <label><input id="elAlone" type="checkbox" /> Must be alone</label><br />
+            <button id="addElement">Add element & repack</button>
         </div>
 
         <hr />
-
-        <h3>Elements</h3>
-        <div id="elementsContainer"></div>
-
-        <hr />
-
-        <h4>Add Element</h4>
-        <label>Width</label><input type="number" id="elWidth" value="0.5" step="0.01">
-        <label>Height</label><input type="number" id="elHeight" value="0.4" step="0.01">
-        <label>Depth</label><input type="number" id="elDepth" value="0.4" step="0.01">
-        <label>Weight</label><input type="number" id="elWeight" value="1" step="0.1">
-        <button id="addElementBtn">Add Element</button>
-
-        <hr />
-        <button id="saveBtn">Save Pallet</button>
+        <h4>Pallets</h4>
+        <div id="palletList"></div>
     </div>
 
     <div class="content">
@@ -159,180 +112,233 @@
     </div>
 
     <script>
-        // initial data from server
-        const holder = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model)) || { Pallets: [], CurrentPalletIndex: 0 };
-        let currentIndex = @currentIndex;
+        // initial holder from server (case-insensitive parsing is handled below)
+        const rawHolder = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model ?? new Pallet_Optimizer.Models.PalletHolder()));
+        let sceneState = { holder: normalizeHolder(rawHolder) };
 
-        // Babylon.js scene setup
+        // Babylon init
         const canvas = document.getElementById('renderCanvas');
-        const engine = new BABYLON.Engine(canvas,true);
+        const engine = new BABYLON.Engine(canvas, true);
         const scene = new BABYLON.Scene(engine);
+        scene.clearColor = new BABYLON.Color4(0.07,0.11,0.14,1);
+        const camera = new BABYLON.ArcRotateCamera("cam", -Math.PI/2, Math.PI/3, 5, BABYLON.Vector3.Zero(), scene);
+        camera.attachControl(canvas, true);
 
-        const camera = new BABYLON.ArcRotateCamera("cam", Math.PI/2, Math.PI/3, 6, BABYLON.Vector3.Zero(), scene);
-        camera.attachControl(canvas,true);
+        const light = new BABYLON.HemisphericLight("h", new BABYLON.Vector3(0,1,0), scene);
+        light.intensity = 0.8;
 
-        const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(1,1,0), scene);
+        let groupNodes = [];
+        let disposableMaterials = [];
 
-        let createdMeshes = [];
-        let createdMaterials = [];
+        function disposeAll() {
+            groupNodes.forEach(n => {
+                try { n.dispose(); } catch(_) {}
+            });
+            groupNodes = [];
 
-        function disposeAll(){
-            createdMeshes.forEach(m=>{try{m.dispose(true,true);}catch{}});
-            createdMeshes=[];
-            createdMaterials.forEach(m=>{try{m.dispose(true,true);}catch{}});
-            createdMaterials=[];
+            disposableMaterials.forEach(m => {
+                try { m.dispose(); } catch(_) {}
+            });
+            disposableMaterials = [];
         }
 
-        function renderPallet(pallet){
-            if(!pallet) return;
+        function safeGet(obj, ...keys) {
+            if (!obj) return undefined;
+            for (const k of keys) {
+                if (k in obj) return obj[k];
+                const lower = k.charAt(0).toLowerCase() + k.slice(1);
+                const upper = k.charAt(0).toUpperCase() + k.slice(1);
+                if (lower in obj) return obj[lower];
+                if (upper in obj) return obj[upper];
+            }
+            return undefined;
+        }
+
+        function normalizeHolder(h) {
+            if (!h) return { Pallets: [], currentPalletIndex: 0 };
+
+            const pallets = (safeGet(h, 'Pallets', 'pallets') || []).map((p, i) => {
+                const width = safeGet(p, 'Width', 'width') || safeGet(p, 'W', 'w') || 1.2;
+                const length = safeGet(p, 'Length', 'length') || safeGet(p, 'LengthM', 'lengthM') || 0.8;
+                const maxHeight = safeGet(p, 'MaxHeight', 'maxHeight') || safeGet(p, 'maxHeight', 'Maxheight') || safeGet(p, 'MaxH', 'maxH') || 1.8;
+                const name = safeGet(p, 'Name', 'name') || `Pallet ${i+1}`;
+                const id = safeGet(p, 'Id', 'id') || safeGet(p, 'ID', 'Id') || String(i+1);
+
+                const elementsRaw = safeGet(p, 'Elements', 'elements') || [];
+                const elements = elementsRaw.map((el, idx) => {
+                    const X = safeGet(el, 'X', 'x') ?? safeGet(el, 'PosX', 'posX') ?? 0;
+                    const Y = safeGet(el, 'Y', 'y') ?? safeGet(el, 'PosY', 'posY') ?? 0;
+                    const Z = safeGet(el, 'Z', 'z') ?? safeGet(el, 'PosZ', 'posZ') ?? 0;
+
+                    // width/depth mapping — handle rotated field names as well
+                    const width = safeGet(el, 'Width', 'width') ?? safeGet(el, 'W', 'w') ?? 0.4;
+                    const depth = safeGet(el, 'Depth', 'depth') ?? safeGet(el, 'D', 'd') ?? 0.4;
+                    const height = safeGet(el, 'Height', 'height') ?? safeGet(el, 'H', 'h') ?? 0.3;
+                    const rotated = !!(safeGet(el, 'Rotated', 'rotated') || safeGet(el, 'IsRotated', 'isRotated'));
+                    const nameEl = safeGet(el, 'Name', 'name') || `E${idx+1}`;
+
+                    return {
+                        Id: safeGet(el, 'Id', 'id') || String(idx+1),
+                        Name: nameEl,
+                        X: Number(X) || 0,
+                        Y: Number(Y) || 0,
+                        Z: Number(Z) || 0,
+                        Width: Number(width) || 0.4,
+                        Depth: Number(depth) || 0.4,
+                        Height: Number(height) || 0.3,
+                        WeightKg: Number(safeGet(el, 'WeightKg', 'weightKg', 'weight')) || 0,
+                        CanRotate: !!safeGet(el, 'CanRotate', 'canRotate'),
+                        MustBeAlone: !!safeGet(el, 'MustBeAlone', 'mustBeAlone'),
+                        Rotated: rotated,
+                        PalletId: safeGet(el, 'PalletId', 'palletId') || id
+                    };
+                });
+
+                return {
+                    Id: id,
+                    Name: name,
+                    Width: Number(width),
+                    Length: Number(length),
+                    MaxHeight: Number(maxHeight),
+                    Elements: elements
+                };
+            });
+
+            return {
+                Pallets: pallets,
+                currentPalletIndex: safeGet(h, 'currentPalletIndex', 'CurrentPalletIndex') || 0
+            };
+        }
+
+        function renderHolder(hRaw) {
+            const h = normalizeHolder(hRaw);
             disposeAll();
 
-            // draw pallet base
-            const baseMat = new BABYLON.StandardMaterial("baseMat", scene);
-            switch(pallet.MaterialType){
-                case "Wood": baseMat.diffuseColor = new BABYLON.Color3(0.6,0.4,0.2); break;
-                case "Plastic": baseMat.diffuseColor = new BABYLON.Color3(0.1,0.6,0.9); break;
-                case "Metal": baseMat.diffuseColor = new BABYLON.Color3(0.7,0.7,0.7); break;
-                default: baseMat.diffuseColor = new BABYLON.Color3(0.8,0.8,0.8);
-            }
-            const base = BABYLON.MeshBuilder.CreateBox("palletBase",{width:1.2,height:0.2,depth:1.0},scene);
-            base.material = baseMat;
-            base.position.y = 0.1;
-            createdMeshes.push(base);
-            createdMaterials.push(baseMat);
+            let offsetX = 0;
+            const gap = 0.6; // gap between pallets in meters
 
-            // draw elements
-            (pallet.Elements||[]).forEach((el,i)=>{
-                const mesh = BABYLON.MeshBuilder.CreateBox(`el_${i}`,{
-                    width:el.Width,height:el.Height,depth:el.Depth
-                },scene);
-                mesh.position.x = el.X||0;
-                mesh.position.y = (el.Y||0)+(el.Height/2)+0.2;
-                mesh.position.z = el.Z||0;
-                const mat = new BABYLON.StandardMaterial(`mat_${i}`,scene);
-                mat.diffuseColor = new BABYLON.Color3(Math.random(),Math.random(),Math.random());
-                mesh.material = mat;
-                createdMeshes.push(mesh);
-                createdMaterials.push(mat);
+            (h.Pallets || []).forEach((p, i) => {
+                const group = new BABYLON.TransformNode("palletGroup_" + i, scene);
+
+                // pallet base (thin box)
+                const base = BABYLON.MeshBuilder.CreateBox("base_" + i, {
+                    width: p.Width, height: 0.05, depth: p.Length
+                }, scene);
+                base.position = new BABYLON.Vector3(offsetX + p.Width / 2, 0.025, p.Length / 2);
+                const mat = new BABYLON.StandardMaterial("mat_"+i, scene);
+                mat.diffuseColor = new BABYLON.Color3(0.6, 0.4, 0.2);
+                base.material = mat;
+                base.parent = group;
+                disposableMaterials.push(mat);
+
+                // draw elements
+                (p.Elements || []).forEach((el, idx) => {
+                    // compute oriented footprint
+                    const w = el.Rotated ? el.Depth : el.Width;
+                    const d = el.Rotated ? el.Width : el.Depth;
+                    const hgt = el.Height;
+
+                    // position mapping:
+                    // X = along pallet width (left -> right)
+                    // Y = along pallet depth (front -> back)
+                    // Z = vertical (bottom -> up)
+                    const posX = offsetX + el.X + w / 2;
+                    const posY = el.Y + d / 2;
+                    const posZ = 0.05 + el.Z + hgt / 2; // raise above pallet base
+
+                    const box = BABYLON.MeshBuilder.CreateBox("el_" + i + "_" + idx, { width: w, height: hgt, depth: d }, scene);
+                    box.position = new BABYLON.Vector3(posX, posZ, posY);
+
+                    const emat = new BABYLON.StandardMaterial("emat_" + i + "_" + idx, scene);
+                    const hue = (idx * 47) % 360;
+                    // Babylon doesn't allow specifying HSV directly easily across versions, so compute simple color
+                    const hNorm = (hue / 360);
+                    const c = hsvToRgb(hNorm, 0.6, 0.9);
+                    emat.diffuseColor = new BABYLON.Color3(c.r, c.g, c.b);
+                    box.material = emat;
+                    disposableMaterials.push(emat);
+
+                    box.parent = group;
+                });
+
+                groupNodes.push(group);
+                offsetX += (p.Width || 1.2) + gap;
             });
+
+            // adjust camera radius and target
+            const totalWidth = (h.Pallets || []).reduce((s, p) => s + ((p.Width || 1.2) + 0.6), 0);
+            camera.target = new BABYLON.Vector3(totalWidth / 2, 0, 0.5);
+            camera.radius = Math.max(3, totalWidth);
+        }
+
+        // small HSV -> RGB helper (inputs: h in [0,1], s,v in [0,1])
+        function hsvToRgb(h, s, v) {
+            let r = 0, g = 0, b = 0;
+            const i = Math.floor(h * 6);
+            const f = h * 6 - i;
+            const p = v * (1 - s);
+            const q = v * (1 - f * s);
+            const t = v * (1 - (1 - f) * s);
+            switch (i % 6) {
+                case 0: r = v; g = t; b = p; break;
+                case 1: r = q; g = v; b = p; break;
+                case 2: r = p; g = v; b = t; break;
+                case 3: r = p; g = q; b = v; break;
+                case 4: r = t; g = p; b = v; break;
+                case 5: r = v; g = p; b = q; break;
+            }
+            return { r, g, b };
         }
 
         engine.runRenderLoop(()=>scene.render());
-        window.addEventListener('resize',()=>engine.resize());
-
-        // populate pallet select
-        const palletSelect = document.getElementById('palletSelect');
-        function refreshPalletSelect(){
-            palletSelect.innerHTML='';
-            holder.Pallets.forEach((p,i)=>{
-                const opt=document.createElement('option');
-                opt.value=i;
-                opt.text=`${p.Name} (${i})`;
-                if(i===currentIndex) opt.selected=true;
-                palletSelect.add(opt);
-            });
-        }
-        refreshPalletSelect();
-
-        palletSelect.addEventListener('change',()=>{
-            currentIndex=parseInt(palletSelect.value);
-            const pallet = holder.Pallets[currentIndex];
-            document.getElementById('materialSelect').value=pallet.MaterialType;
-            document.getElementById('maxHeight').value=pallet.MaxHeight||0;
-            document.getElementById('maxWeight').value=pallet.MaxWeight||0;
-            renderPallet(pallet);
-            refreshElementList();
-        });
-
-        // pallet settings
-        document.getElementById('materialSelect').addEventListener('change',()=>{
-            const val=document.getElementById('materialSelect').value;
-            holder.Pallets[currentIndex].MaterialType=val;
-            renderPallet(holder.Pallets[currentIndex]);
-        });
-        document.getElementById('maxHeight').addEventListener('input',()=>holder.Pallets[currentIndex].MaxHeight=parseFloat(document.getElementById('maxHeight').value));
-        document.getElementById('maxWeight').addEventListener('input',()=>holder.Pallets[currentIndex].MaxWeight=parseFloat(document.getElementById('maxWeight').value));
-
-        // elements list
-        function refreshElementList(){
-            const container=document.getElementById('elementsContainer');
-            container.innerHTML='';
-            const elements=holder.Pallets[currentIndex].Elements||[];
-            elements.forEach((el,i)=>{
-                const div=document.createElement('div');
-                div.className='element-row';
-                div.innerHTML=`
-                    <strong>Element ${i}</strong><br/>
-                    X:<input type="number" value="${el.X||0}" step="0.01" data-prop="X" data-index="${i}"/>
-                    Y:<input type="number" value="${el.Y||0}" step="0.01" data-prop="Y" data-index="${i}"/>
-                    Z:<input type="number" value="${el.Z||0}" step="0.01" data-prop="Z" data-index="${i}"/><br/>
-                    W:<input type="number" value="${el.Width}" step="0.01" data-prop="Width" data-index="${i}"/>
-                    H:<input type="number" value="${el.Height}" step="0.01" data-prop="Height" data-index="${i}"/>
-                    D:<input type="number" value="${el.Depth}" step="0.01" data-prop="Depth" data-index="${i}"/><br/>
-                    Weight:<input type="number" value="${el.WeightKg||0}" step="0.1" data-prop="WeightKg" data-index="${i}"/>
-                    <button data-action="rotate" data-index="${i}">Rotate</button>
-                    <button data-action="delete" data-index="${i}">Delete</button>
-                `;
-                container.appendChild(div);
-            });
-
-            // input updates
-            container.querySelectorAll('input').forEach(inp=>{
-                inp.addEventListener('input',()=>{
-                    const idx=parseInt(inp.dataset.index);
-                    const prop=inp.dataset.prop;
-                    holder.Pallets[currentIndex].Elements[idx][prop]=parseFloat(inp.value);
-                    renderPallet(holder.Pallets[currentIndex]);
-                });
-            });
-
-            // rotate/delete
-            container.querySelectorAll('button').forEach(btn=>{
-                btn.addEventListener('click',()=>{
-                    const idx=parseInt(btn.dataset.index);
-                    const action=btn.dataset.action;
-                    if(action==='rotate'){
-                        const el=holder.Pallets[currentIndex].Elements[idx];
-                        [el.Width,el.Depth]=[el.Depth,el.Width];
-                        renderPallet(holder.Pallets[currentIndex]);
-                        refreshElementList();
-                    }else if(action==='delete'){
-                        holder.Pallets[currentIndex].Elements.splice(idx,1);
-                        renderPallet(holder.Pallets[currentIndex]);
-                        refreshElementList();
-                    }
-                });
-            });
-        }
-
-        refreshElementList();
-
-        // add element
-        document.getElementById('addElementBtn').addEventListener('click',()=>{
-            const el={Width:parseFloat(document.getElementById('elWidth').value),
-                      Height:parseFloat(document.getElementById('elHeight').value),
-                      Depth:parseFloat(document.getElementById('elDepth').value),
-                      WeightKg:parseFloat(document.getElementById('elWeight').value),
-                      X:0,Y:0,Z:0};
-            if(!holder.Pallets[currentIndex].Elements) holder.Pallets[currentIndex].Elements=[];
-            holder.Pallets[currentIndex].Elements.push(el);
-            renderPallet(holder.Pallets[currentIndex]);
-            refreshElementList();
-        });
-
-        // save pallet
-        document.getElementById('saveBtn').addEventListener('click',()=>{
-            fetch('/Pallet/UpdatePallet',{
-                method:'POST',
-                headers:{'Content-Type':'application/json'},
-                body:JSON.stringify(holder.Pallets[currentIndex])
-            }).then(r=>r.json())
-              .then(res=>{if(res.success)console.log('Saved'); else console.error('Save failed');})
-              .catch(err=>console.error(err));
-        });
+        window.addEventListener('resize', ()=>engine.resize());
 
         // initial render
-        renderPallet(holder.Pallets[currentIndex]);
+        renderHolder(sceneState.holder);
+        rebuildPalletList();
+
+        // UI functions
+        function rebuildPalletList() {
+            const el = document.getElementById('palletList');
+            el.innerHTML = '';
+            (sceneState.holder.Pallets || []).forEach(p => {
+                const div = document.createElement('div');
+                div.innerHTML = `<strong>${p.Name}</strong> (W:${p.Width} L:${p.Length} H:${p.MaxHeight}) - elements: ${p.Elements?.length || 0}`;
+                el.appendChild(div);
+            });
+        }
+
+        async function postJson(url, body) {
+            const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+            if (!r.ok) throw new Error(await r.text());
+            return r.json();
+        }
+
+        document.getElementById('addElement').addEventListener('click', async ()=> {
+            const dto = {
+                Name: document.getElementById('elName').value || 'Box',
+                Width: parseFloat(document.getElementById('elW').value) || 0.4,
+                Depth: parseFloat(document.getElementById('elD').value) || 0.4,
+                Height: parseFloat(document.getElementById('elH').value) || 0.3,
+                WeightKg: parseFloat(document.getElementById('elWeight').value) || 1,
+                CanRotate: document.getElementById('elRotate').checked,
+                MustBeAlone: document.getElementById('elAlone').checked
+            };
+
+            try {
+                const json = await postJson('/Pallet/AddElement', dto);
+                if (json && json.holder) {
+                    sceneState.holder = normalizeHolder(json.holder);
+                    renderHolder(sceneState.holder);
+                    rebuildPalletList();
+                } else {
+                    alert('Add returned unexpected result');
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Add failed: ' + err.message);
+            }
+        });
     </script>
 </body>
 </html>
