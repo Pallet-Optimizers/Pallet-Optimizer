@@ -19,9 +19,6 @@ var app = builder.Build();
 app.UseStaticFiles();
 app.UseRouting();
 
-// Tilføj session middleware
-app.UseSession();
-
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Pallet}/{action=Index}");
