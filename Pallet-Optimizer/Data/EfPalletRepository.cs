@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
-using Pallet_Optimizer.Data.Database;
 using Pallet_Optimizer.Models;
+using Pallet_Optimizer.Data.Database;
 
 namespace Pallet_Optimizer.Data {
     public class EfPalletRepository : IPalletRepository {
@@ -204,6 +204,73 @@ namespace Pallet_Optimizer.Data {
             foreach (var pair in elementPairs) {
                 pair.Domain.Id = pair.Db.ElementId.ToString();
             }
+        }
+
+        public async Task<List<PackagePlanViewModel>> GetAllPackagePlansAsync() {
+            // Prefer PackagePlanDb name when present; fall back to "Plan {id}"
+            var plans = await _context.Set<OptimizationPlanDb>()
+                .Select(op => new PackagePlanViewModel {
+                    Id = op.PlanId.ToString(),
+                    Name = _context.Set<PackagePlanDb>()
+                                   .Where(pp => pp.PlanId == op.PlanId)
+                                   .Select(pp => pp.PackageName)
+                                   .FirstOrDefault() ?? ("Plan " + op.PlanId),
+                    CreatedDate = op.CreatedDate,
+                    LastModified = op.CreatedDate,
+                    PalletCount = op.PalletCount,
+                    TotalElements = op.ElementPlacements.Count,
+                    TotalWeight = Convert.ToDouble(op.TotalWeight)
+                })
+                .OrderByDescending(p => p.CreatedDate)
+                .ToListAsync();
+
+            return plans;
+        }
+
+        public async Task<string> CreatePackagePlanAsync(string planName) {
+            if (string.IsNullOrWhiteSpace(planName))
+                throw new ArgumentException("Plan name must be provided.", nameof(planName));
+
+            var newPlan = new OptimizationPlanDb {
+                CreatedDate = DateTime.UtcNow,
+                PalletCount = 0,
+                TotalWeight = 0m,
+                TotalHeight = 0m
+            };
+
+            await _context.Set<OptimizationPlanDb>().AddAsync(newPlan);
+            await _context.SaveChangesAsync();
+
+            var pkg = new PackagePlanDb {
+                PlanId = newPlan.PlanId,
+                PackageName = planName,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            await _context.Set<PackagePlanDb>().AddAsync(pkg);
+            await _context.SaveChangesAsync();
+
+            return newPlan.PlanId.ToString();
+        }
+
+        public async Task<bool> DeletePackagePlanAsync(string id) {
+            if (!int.TryParse(id, out var planId)) return false;
+
+            var plan = await _context.Set<OptimizationPlanDb>()
+                .Include(p => p.PackagePlans)
+                .Include(p => p.PlanPallets)
+                .Include(p => p.ElementPlacements)
+                .FirstOrDefaultAsync(p => p.PlanId == planId);
+
+            if (plan == null) return false;
+
+            if (plan.PackagePlans?.Any() == true) _context.RemoveRange(plan.PackagePlans);
+            if (plan.PlanPallets?.Any() == true) _context.RemoveRange(plan.PlanPallets);
+            if (plan.ElementPlacements?.Any() == true) _context.RemoveRange(plan.ElementPlacements);
+
+            _context.Remove(plan);
+            await _context.SaveChangesAsync();
+            return true;
         }
     }
 }

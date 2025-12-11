@@ -6,7 +6,6 @@ using Pallet_Optimizer.Models;
 
 namespace Pallet_Optimizer.Data
 {
-    // Hybrid repository: EF persistence + in-memory cache.
     public class HybridPalletRepository : IPalletRepository
     {
         private readonly EfPalletRepository _ef;
@@ -98,6 +97,49 @@ namespace Pallet_Optimizer.Data
             // Sync memory copy
             var refreshed = await _ef.GetHolderAsync();
             await _mem.UpdateHolderAsync(refreshed);
+        }
+
+        public async Task<List<PackagePlanViewModel>> GetAllPackagePlansAsync()
+        {
+            try
+            {
+                var efPlans = await _ef.GetAllPackagePlansAsync();
+                return efPlans;
+            }
+            catch
+            {
+                return await _mem.GetAllPackagePlansAsync();
+            }
+        }
+
+        public async Task<string> CreatePackagePlanAsync(string planName)
+        {
+            try
+            {
+                var id = await _ef.CreatePackagePlanAsync(planName);
+                return id;
+            }
+            catch
+            {
+                return await _mem.CreatePackagePlanAsync(planName);
+            }
+        }
+
+        public async Task<bool> DeletePackagePlanAsync(string id)
+        {
+            var ok = false;
+            try
+            {
+                ok = await _ef.DeletePackagePlanAsync(id);
+            }
+            catch
+            {
+                // ignore
+            }
+
+            // Reflect deletion in memory cache as best-effort
+            await _mem.DeletePackagePlanAsync(id);
+            return ok;
         }
     }
 }

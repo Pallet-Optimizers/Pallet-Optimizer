@@ -8,6 +8,7 @@ using Pallet_Optimizer.Models;
 public class InMemoryPalletRepository : IPalletRepository
 {
     private readonly PalletHolder _holder;
+    private readonly List<PackagePlanViewModel> _plans = new();
 
     public InMemoryPalletRepository()
     {
@@ -58,5 +59,40 @@ public class InMemoryPalletRepository : IPalletRepository
         _holder.Pallets = holder.Pallets;
         _holder.CurrentPalletIndex = holder.CurrentPalletIndex;
         return Task.CompletedTask;
+    }
+
+    // Package plan operations
+    public Task<List<PackagePlanViewModel>> GetAllPackagePlansAsync()
+    {
+        var list = _plans.OrderByDescending(p => p.CreatedDate).ToList();
+        return Task.FromResult(list);
+    }
+
+    public Task<string> CreatePackagePlanAsync(string planName)
+    {
+        if (string.IsNullOrWhiteSpace(planName))
+            throw new ArgumentException("Plan name must be provided.", nameof(planName));
+
+        var id = Guid.NewGuid().ToString("N");
+        var now = DateTime.UtcNow;
+
+        _plans.Add(new PackagePlanViewModel
+        {
+            Id = id,
+            Name = planName,
+            CreatedDate = now,
+            LastModified = now,
+            PalletCount = 0,
+            TotalElements = 0,
+            TotalWeight = 0
+        });
+
+        return Task.FromResult(id);
+    }
+
+    public Task<bool> DeletePackagePlanAsync(string id)
+    {
+        var removed = _plans.RemoveAll(p => p.Id == id) > 0;
+        return Task.FromResult(removed);
     }
 }
